@@ -54,7 +54,7 @@
                     <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-bold text-white shadow-lg">
                         T
                     </div>
-                    <span class="text-xl font-bold tracking-tight text-white">TiendaERP</span>
+                    <span class="text-xl font-bold tracking-tight text-white">CRM-AC</span>
                 </div>
                 <div class="hidden md:flex items-center gap-8 text-sm font-medium text-gray-300">
                     <a href="#features" class="hover:text-white transition-colors duration-200">Características</a>
