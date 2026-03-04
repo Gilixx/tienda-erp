@@ -11,7 +11,13 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // Register custom service access middleware alias
+        $middleware->alias([
+            'service' => \App\Http\Middleware\CheckServiceAccess::class,
+        ]);
+
+        // Redirect unauthenticated users to login
+        $middleware->redirectGuestsTo('/login');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

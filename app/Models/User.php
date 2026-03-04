@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class User extends Authenticatable
 {
@@ -21,6 +21,9 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'role',
+        'is_active',
+        'phone',
     ];
 
     /**
@@ -42,7 +45,45 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            'password' => 'hashed',  // auto-bcrypt on assignment
+            'is_active' => 'boolean',
         ];
+    }
+
+    /**
+     * Services/modules contracted by this user.
+     */
+    public function services(): BelongsToMany
+    {
+        return $this->belongsToMany(Service::class, 'user_service')
+                    ->withPivot('granted_at', 'expires_at')
+                    ->withTimestamps();
+    }
+
+    /**
+     * Check if the user is an admin (full access to all modules).
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    /**
+     * Check if the user has access to a specific service/module.
+     * Admins always have access.
+     */
+    public function hasService(string $key): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        return $this->services()
+                    ->where('key', $key)
+                    ->where(function ($query) {
+                        $query->whereNull('expires_at')
+                              ->orWhere('expires_at', '>', now());
+                    })
+                    ->exists();
     }
 }
