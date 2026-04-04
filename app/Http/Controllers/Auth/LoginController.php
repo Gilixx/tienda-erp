@@ -23,6 +23,11 @@ class LoginController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        // Honeypot anti-bot: si el campo oculto tiene valor, es un bot
+        if ($request->filled('website_url')) {
+            abort(422);
+        }
+
         $credentials = $request->validate([
             'email'    => ['required', 'email'],
             'password' => ['required'],

@@ -3,6 +3,7 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="csrf-token" content="{{ csrf_token() }}">
         <title>{{ config('app.name', 'Tienda ERP') }} - Finanzas e Inventario</title>
 
         <!-- Fonts -->
@@ -41,12 +42,11 @@
         </style>
     </head>
     <body class="bg-slate-50 text-slate-800 antialiased relative overflow-x-hidden selection:bg-emerald-500/30">
-        <!-- Background Blobs -->
-        <div class="blob bg-orange-200/50 w-96 h-96 rounded-full top-[-10%] left-[-10%]"></div>
-        <div class="blob bg-emerald-200/50 w-[500px] h-[500px] rounded-full bottom-[-20%] right-[-10%] mix-blend-multiply" style="animation-delay: 2s;"></div>
-        <div class="blob bg-amber-100/50 w-[400px] h-[400px] rounded-full top-[40%] left-[20%] mix-blend-multiply" style="animation-delay: 4s;"></div>
-
-        <div class="relative z-10 flex flex-col min-h-screen">
+        <div class="relative flex flex-col min-h-screen overflow-hidden">
+            <!-- Background Blobs -->
+            <div class="blob bg-orange-200/50 w-96 h-96 rounded-full top-[-10%] left-[-10%]"></div>
+            <div class="blob bg-emerald-200/50 w-[500px] h-[500px] rounded-full bottom-[-20%] right-[-10%] mix-blend-multiply" style="animation-delay: 2s;"></div>
+            <div class="blob bg-amber-100/50 w-[400px] h-[400px] rounded-full top-[40%] left-[20%] mix-blend-multiply" style="animation-delay: 4s;"></div>
             <!-- Navbar -->
             <nav class="w-full px-6 py-4 flex items-center justify-between glassmorphism sticky top-0 z-50 shadow-sm">
                 <div class="flex items-center gap-2">
@@ -75,7 +75,7 @@
             </nav>
 
             <!-- Hero Section -->
-            <main class="flex-grow flex items-center justify-center px-6 py-20 lg:py-32 relative">
+            <main class="flex items-center justify-center px-6 py-20 lg:py-32 relative">
                 <div class="max-w-5xl mx-auto text-center">
                     <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white text-xs font-medium text-emerald-600 mb-8 border border-emerald-200 shadow-sm">
                         <span class="flex w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>

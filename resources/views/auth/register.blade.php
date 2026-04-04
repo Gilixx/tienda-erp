@@ -30,6 +30,10 @@
 
             <form method="POST" action="{{ route('register') }}" class="space-y-5">
                 @csrf
+                {{-- Honeypot anti-bot: campo invisible que solo los bots llenan --}}
+                <div style="position:absolute;left:-9999px" aria-hidden="true">
+                    <input type="text" name="website_url" tabindex="-1" autocomplete="off">
+                </div>
 
                 <!-- Name -->
                 <div>

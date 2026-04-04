@@ -26,6 +26,11 @@ class RegisterController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        // Honeypot anti-bot: si el campo oculto tiene valor, es un bot
+        if ($request->filled('website_url')) {
+            abort(422);
+        }
+
         $request->validate([
             'name'     => ['required', 'string', 'max:255'],
             'email'    => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users'],
@@ -38,9 +43,12 @@ class RegisterController extends Controller
             'email'    => $request->email,
             'password' => $request->password, // auto-hashed via cast
             'phone'    => $request->phone,
-            'role'     => 'user',
-            'is_active'=> true,
         ]);
+
+        // Asignar rol y estado manualmente (no via mass assignment por seguridad)
+        $user->role = 'user';
+        $user->is_active = true;
+        $user->save();
 
         event(new Registered($user));
 
