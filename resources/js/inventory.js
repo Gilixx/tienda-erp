@@ -590,6 +590,90 @@ document.addEventListener('DOMContentLoaded', () => {
         productsTbody?.classList.remove('hidden');
     }
 
+    // ─── Importar CSV ──────────────────────────────────────────
+    const importBtn          = document.getElementById('import-products-btn');
+    const importModal        = document.getElementById('import-modal');
+    const closeImportModal   = document.getElementById('close-import-modal');
+    const cancelImportModal  = document.getElementById('cancel-import-modal');
+    const importForm         = document.getElementById('import-form');
+    const importFileInput    = document.getElementById('import-file');
+    const importResult       = document.getElementById('import-result');
+    const importSubmitBtn    = document.getElementById('import-submit-btn');
+    const downloadTemplateBtn = document.getElementById('download-template-btn');
+
+    function openImportModal() {
+        importForm?.reset();
+        importResult?.classList.add('hidden');
+        importResult.textContent = '';
+        importModal?.classList.remove('hidden');
+    }
+    function closeImport() {
+        importModal?.classList.add('hidden');
+    }
+
+    importBtn?.addEventListener('click', openImportModal);
+    closeImportModal?.addEventListener('click', closeImport);
+    cancelImportModal?.addEventListener('click', closeImport);
+    importModal?.addEventListener('click', (e) => { if (e.target === importModal.firstElementChild) closeImport(); });
+
+    downloadTemplateBtn?.addEventListener('click', () => {
+        window.location.href = '/api/inventory/products-template';
+    });
+
+    importForm?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const file = importFileInput?.files?.[0];
+        if (!file) return;
+
+        if (file.size > 5 * 1024 * 1024) {
+            showToast('Archivo excede 5 MB', 'error');
+            return;
+        }
+
+        const fd = new FormData();
+        fd.append('file', file);
+
+        importSubmitBtn.disabled = true;
+        importSubmitBtn.textContent = 'Importando…';
+        importResult.classList.add('hidden');
+
+        try {
+            const { data } = await api.post('/api/inventory/products-import', fd);
+
+            const msg = `Creados: ${data.created} · Actualizados: ${data.updated}` +
+                        (data.error_count ? ` · Errores: ${data.error_count}` : '');
+            importResult.textContent = msg;
+            importResult.className = 'text-sm rounded-xl p-3 ' +
+                (data.error_count ? 'bg-amber-50 text-amber-800 border border-amber-100'
+                                  : 'bg-emerald-50 text-emerald-800 border border-emerald-100');
+            importResult.classList.remove('hidden');
+
+            if (data.errors && data.errors.length) {
+                const details = document.createElement('details');
+                details.className = 'mt-2 text-xs';
+                details.innerHTML = `<summary class="cursor-pointer">Ver errores</summary><ul class="list-disc list-inside mt-1">${data.errors.map(e => `<li>${e.replace(/</g,'&lt;')}</li>`).join('')}</ul>`;
+                importResult.appendChild(details);
+            }
+
+            showToast('Importación completada');
+            await Promise.all([fetchCategories(), fetchProducts()]);
+            renderStats();
+            renderCategories();
+            renderProducts();
+            populateCategorySelects();
+            populateProductSelects();
+        } catch (err) {
+            const msg = err.response?.data?.message || 'Error al importar';
+            importResult.textContent = msg;
+            importResult.className = 'text-sm rounded-xl p-3 bg-rose-50 text-rose-800 border border-rose-100';
+            importResult.classList.remove('hidden');
+            showToast(msg, 'error');
+        } finally {
+            importSubmitBtn.disabled = false;
+            importSubmitBtn.textContent = 'Importar';
+        }
+    });
+
     // ─── Start ─────────────────────────────────────────────────
     init();
 });

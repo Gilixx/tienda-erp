@@ -45,6 +45,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/dashboard/inventory', function () {
             return view('modules.inventory');
         })->name('inventory');
+
+        Route::get('/dashboard/inventory/estadisticas', function () {
+            return view('modules.estadisticas');
+        })->name('inventory.stats');
     });
 
     Route::middleware('service:finance')->group(function () {

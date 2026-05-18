@@ -43,6 +43,10 @@
             <input id="search-input" type="search" placeholder="Buscar por nombre o SKU…" class="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition-all">
         </div>
         <div class="flex gap-3 flex-shrink-0">
+            <button id="import-products-btn" class="bg-amber-50 hover:bg-amber-100 text-amber-700 px-4 py-2.5 rounded-xl font-medium text-sm shadow-sm transition-all focus:ring-4 focus:ring-amber-100 flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"/></svg>
+                Importar CSV
+            </button>
             <button id="add-category-btn" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-4 py-2.5 rounded-xl font-medium text-sm shadow-sm transition-all focus:ring-4 focus:ring-indigo-100 flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
                 Nueva Categoría
@@ -126,6 +130,51 @@
                         <!-- JS rendered -->
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ MODAL: IMPORT CSV ═══ -->
+    <div id="import-modal" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 flex">
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"></div>
+        <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100">
+            <div class="p-6 sm:p-8">
+                <div class="flex justify-between items-center mb-5">
+                    <h3 class="text-xl font-bold text-slate-800">Importar Catálogo</h3>
+                    <button type="button" id="close-import-modal" class="text-slate-400 hover:text-slate-600 transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+
+                <div class="bg-amber-50 border border-amber-100 rounded-xl p-3 mb-4 text-xs text-amber-800">
+                    <p class="font-semibold mb-1">Instrucciones:</p>
+                    <ul class="list-disc list-inside space-y-0.5">
+                        <li>Descarga la plantilla y llénala con tus productos.</li>
+                        <li>Columnas requeridas: <code>sku</code>, <code>nombre</code>, <code>precio</code>.</li>
+                        <li>Opcionales: <code>categoria</code>, <code>costo</code>, <code>stock</code>, <code>stock_minimo</code>, <code>descripcion</code>.</li>
+                        <li>Si el SKU ya existe, se actualizará el producto.</li>
+                        <li>Máximo 5,000 filas / 5 MB.</li>
+                    </ul>
+                </div>
+
+                <button id="download-template-btn" type="button" class="w-full mb-4 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-xl font-medium text-sm transition-colors flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"/></svg>
+                    Descargar plantilla
+                </button>
+
+                <form id="import-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Archivo CSV <span class="text-rose-500">*</span></label>
+                        <input type="file" name="file" id="import-file" accept=".csv,text/csv" required class="w-full text-sm text-slate-700 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100">
+                    </div>
+
+                    <div id="import-result" class="hidden text-sm rounded-xl p-3"></div>
+
+                    <div class="pt-2 flex justify-end gap-3">
+                        <button type="button" id="cancel-import-modal" class="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium text-sm transition-colors">Cancelar</button>
+                        <button type="submit" id="import-submit-btn" class="bg-amber-600 hover:bg-amber-700 text-white px-6 py-2.5 rounded-xl font-medium text-sm shadow-sm transition-all focus:ring-4 focus:ring-amber-100">Importar</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

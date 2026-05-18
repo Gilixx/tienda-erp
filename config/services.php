@@ -28,6 +28,12 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'ollama' => [
+        'url'     => env('OLLAMA_URL', 'http://127.0.0.1:11434'),
+        'model'   => env('OLLAMA_MODEL', 'llama3.2:3b'),
+        'timeout' => env('OLLAMA_TIMEOUT', 120),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

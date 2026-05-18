@@ -36,6 +36,16 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         // Productos
         Route::apiResource('products', \App\Http\Controllers\Api\Inventory\ProductController::class);
 
+        // Importación catálogo
+        Route::get('/products-template', [\App\Http\Controllers\Api\Inventory\ImportController::class, 'template']);
+        Route::post('/products-import', [\App\Http\Controllers\Api\Inventory\ImportController::class, 'import'])
+            ->middleware('throttle:10,1');
+
+        // Estadísticas
+        Route::get('/stats', [\App\Http\Controllers\Api\Inventory\StatsController::class, 'index']);
+        Route::get('/stats/report', [\App\Http\Controllers\Api\Inventory\StatsController::class, 'report'])
+            ->middleware('throttle:5,1');
+
         // Movimientos
         Route::get('/movements', [\App\Http\Controllers\Api\Inventory\MovementController::class, 'index']);
         Route::post('/movements', [\App\Http\Controllers\Api\Inventory\MovementController::class, 'store']);
