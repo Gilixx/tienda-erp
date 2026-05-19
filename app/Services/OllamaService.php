@@ -10,12 +10,33 @@ class OllamaService
     private string $baseUrl;
     private string $model;
     private int $timeout;
+    private string $keepAlive;
 
     public function __construct()
     {
-        $this->baseUrl = rtrim(config('services.ollama.url', 'http://127.0.0.1:11434'), '/');
-        $this->model   = config('services.ollama.model', 'llama3.2:3b');
-        $this->timeout = (int) config('services.ollama.timeout', 120);
+        $this->baseUrl   = rtrim(config('services.ollama.url', 'http://127.0.0.1:11434'), '/');
+        $this->model     = config('services.ollama.model', 'llama3.2:3b');
+        $this->timeout   = (int) config('services.ollama.timeout', 180);
+        $this->keepAlive = config('services.ollama.keep_alive', '24h');
+    }
+
+    /**
+     * Pre-carga el modelo en memoria (sin generar). Ideal para warmup.
+     */
+    public function warmup(): bool
+    {
+        try {
+            $response = Http::timeout(120)->post($this->baseUrl . '/api/generate', [
+                'model'      => $this->model,
+                'prompt'     => '',
+                'stream'     => false,
+                'keep_alive' => $this->keepAlive,
+            ]);
+            return $response->successful();
+        } catch (\Throwable $e) {
+            Log::warning('Ollama warmup failed', ['error' => $e->getMessage()]);
+            return false;
+        }
     }
 
     /**
@@ -24,12 +45,13 @@ class OllamaService
     public function generate(string $prompt, ?string $system = null): string
     {
         $payload = [
-            'model'   => $this->model,
-            'prompt'  => $prompt,
-            'stream'  => false,
-            'options' => [
+            'model'      => $this->model,
+            'prompt'     => $prompt,
+            'stream'     => false,
+            'keep_alive' => $this->keepAlive,
+            'options'    => [
                 'temperature' => 0.3,
-                'num_predict' => 1500,
+                'num_predict' => 600,
             ],
         ];
 

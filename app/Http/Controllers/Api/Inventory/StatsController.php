@@ -40,6 +40,10 @@ class StatsController extends Controller
      */
     public function report(Request $request, OllamaService $ollama)
     {
+        // PHP corta scripts en 30s por defecto; el informe IA puede tardar más.
+        @set_time_limit(300);
+        @ini_set('max_execution_time', '300');
+
         $days = (int) $request->input('days', 90);
         $days = max(7, min(365, $days));
 
@@ -211,34 +215,34 @@ class StatsController extends Controller
         $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 
         return <<<PROMPT
-Analiza estos datos agregados de ventas de los últimos {$data['period_days']} días y genera un informe ejecutivo en español, formato Markdown.
+Analiza estos datos de ventas ({$data['period_days']} días) y genera un informe BREVE en español, Markdown.
 
 DATOS:
 ```json
 {$json}
 ```
 
-Estructura el informe con estas secciones (usa exactamente estos títulos):
+Usa EXACTAMENTE estas secciones, MUY concisas (máximo 2 bullets cada una):
 
-## Resumen Ejecutivo
-2-3 líneas con lo más importante.
+## Resumen
+1 línea con lo clave.
 
-## Productos Top
-Lista los 5 más vendidos con interpretación breve.
+## Top 3 Productos
+Solo los 3 más vendidos con número de unidades.
 
 ## Productos Estancados
-Identifica productos sin movimiento y sugiere acción (promoción, descuento, descontinuar).
+2-3 productos sin movimiento + acción sugerida (1 línea c/u).
 
-## Tendencias
-Comenta evolución mensual y patrones detectados.
+## Proyección
+1 línea: estimación próximas 4 semanas.
 
-## Proyección Próximo Periodo
-Estimación de ventas para próximas 4 semanas basada en tendencias.
+## Acciones Recomendadas
+3 bullets cortos, accionables.
 
-## Recomendaciones de Negocio
-3-5 acciones concretas y priorizadas (reorden, promociones, ajustes de precio, etc.).
-
-Sé directo, usa números cuando ayuden. No inventes datos que no estén en el JSON.
+REGLAS:
+- Sé telegráfico. Sin párrafos largos.
+- Usa números reales del JSON.
+- No inventes datos.
 PROMPT;
     }
 }
