@@ -52,5 +52,7 @@ class DatabaseSeeder extends Seeder
             'granted_at' => now(),
             'expires_at' => null,
         ]);
+
+        $this->call(FinanceSeeder::class);
     }
 }
