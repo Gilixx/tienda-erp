@@ -31,97 +31,118 @@
 
     {{-- KPIs --}}
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="bg-white border border-slate-200/60 rounded-2xl p-4 shadow-sm">
-            <p class="text-xs text-slate-500 font-medium uppercase tracking-wider">Ingresos</p>
-            <p id="kpi-ingresos" class="text-2xl font-bold text-emerald-600 mt-1">—</p>
+        <div class="bg-white border border-slate-200/70 border-l-[3px] border-l-emerald-500 rounded-2xl p-4">
+            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Ingresos</p>
+            <p id="kpi-ingresos" class="text-2xl font-mono font-semibold text-emerald-600 mt-2 tabular-nums">—</p>
         </div>
-        <div class="bg-white border border-slate-200/60 rounded-2xl p-4 shadow-sm">
-            <p class="text-xs text-slate-500 font-medium uppercase tracking-wider">Egresos</p>
-            <p id="kpi-egresos" class="text-2xl font-bold text-rose-600 mt-1">—</p>
+        <div class="bg-white border border-slate-200/70 border-l-[3px] border-l-rose-500 rounded-2xl p-4">
+            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Egresos</p>
+            <p id="kpi-egresos" class="text-2xl font-mono font-semibold text-rose-600 mt-2 tabular-nums">—</p>
         </div>
-        <div class="bg-white border border-slate-200/60 rounded-2xl p-4 shadow-sm">
-            <p class="text-xs text-slate-500 font-medium uppercase tracking-wider">Utilidad</p>
-            <p id="kpi-utilidad" class="text-2xl font-bold text-slate-800 mt-1">—</p>
-            <p id="kpi-margen" class="text-xs text-slate-400 mt-0.5">Margen —%</p>
+        <div class="bg-white border border-slate-200/70 border-l-[3px] border-l-amber-500 rounded-2xl p-4">
+            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Utilidad</p>
+            <p id="kpi-utilidad" class="text-2xl font-mono font-semibold text-slate-900 mt-2 tabular-nums">—</p>
+            <p id="kpi-margen" class="text-xs font-mono text-slate-400 mt-1 tabular-nums">Margen —%</p>
         </div>
-        <div class="bg-white border border-slate-200/60 rounded-2xl p-4 shadow-sm">
-            <p class="text-xs text-slate-500 font-medium uppercase tracking-wider">Saldo total</p>
-            <p id="kpi-saldo" class="text-2xl font-bold text-indigo-600 mt-1">—</p>
-            <p id="kpi-cuentas-info" class="text-xs text-slate-400 mt-0.5">— cuentas</p>
+        <div class="bg-white border border-slate-200/70 border-l-[3px] border-l-indigo-500 rounded-2xl p-4">
+            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Saldo total</p>
+            <p id="kpi-saldo" class="text-2xl font-mono font-semibold text-indigo-600 mt-2 tabular-nums">—</p>
+            <p id="kpi-cuentas-info" class="text-xs font-mono text-slate-400 mt-1 tabular-nums">— cuentas</p>
         </div>
     </div>
 
     {{-- Alertas CxC / CxP --}}
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="bg-gradient-to-br from-amber-50 to-white border border-amber-100 rounded-2xl p-4 flex items-center justify-between">
+        <div class="bg-white border border-amber-200/70 border-l-[3px] border-l-amber-500 rounded-2xl p-4 flex items-center justify-between">
             <div>
-                <p class="text-xs text-amber-700 font-semibold uppercase tracking-wider">Por cobrar</p>
-                <p id="cxc-monto" class="text-xl font-bold text-amber-700 mt-1">—</p>
-                <p id="cxc-info" class="text-xs text-amber-600 mt-0.5">—</p>
+                <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Por cobrar</p>
+                <p id="cxc-monto" class="text-xl font-mono font-semibold text-amber-700 mt-2 tabular-nums">—</p>
+                <p id="cxc-info" class="text-xs font-mono text-slate-400 mt-1 tabular-nums">—</p>
             </div>
-            <svg class="w-10 h-10 text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+            <svg class="w-9 h-9 text-amber-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+            </svg>
         </div>
-        <div class="bg-gradient-to-br from-rose-50 to-white border border-rose-100 rounded-2xl p-4 flex items-center justify-between">
+        <div class="bg-white border border-rose-200/70 border-l-[3px] border-l-rose-500 rounded-2xl p-4 flex items-center justify-between">
             <div>
-                <p class="text-xs text-rose-700 font-semibold uppercase tracking-wider">Por pagar</p>
-                <p id="cxp-monto" class="text-xl font-bold text-rose-700 mt-1">—</p>
-                <p id="cxp-info" class="text-xs text-rose-600 mt-0.5">—</p>
+                <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Por pagar</p>
+                <p id="cxp-monto" class="text-xl font-mono font-semibold text-rose-700 mt-2 tabular-nums">—</p>
+                <p id="cxp-info" class="text-xs font-mono text-slate-400 mt-1 tabular-nums">—</p>
             </div>
-            <svg class="w-10 h-10 text-rose-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+            <svg class="w-9 h-9 text-rose-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+            </svg>
         </div>
     </div>
 
     {{-- Gráficas --}}
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="bg-white border border-slate-200/60 rounded-2xl p-5 shadow-sm">
-            <h3 class="text-sm font-semibold text-slate-700 mb-3">Flujo diario (ingresos vs egresos)</h3>
-            <div class="relative h-72"><canvas id="chart-flow"></canvas></div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div class="bg-white border border-slate-200/70 rounded-2xl p-5">
+            <div class="mb-4">
+                <h3 class="text-sm font-semibold text-slate-800">Flujo diario</h3>
+                <p class="text-xs text-slate-400 mt-0.5">Ingresos vs egresos por día</p>
+            </div>
+            <div class="relative h-64"><canvas id="chart-flow"></canvas></div>
         </div>
-        <div class="bg-white border border-slate-200/60 rounded-2xl p-5 shadow-sm">
-            <h3 class="text-sm font-semibold text-slate-700 mb-3">Distribución de egresos por categoría</h3>
-            <div class="relative h-72"><canvas id="chart-cats"></canvas></div>
+        <div class="bg-white border border-slate-200/70 rounded-2xl p-5">
+            <div class="mb-4">
+                <h3 class="text-sm font-semibold text-slate-800">Distribución de egresos</h3>
+                <p class="text-xs text-slate-400 mt-0.5">Por categoría en el periodo</p>
+            </div>
+            <div class="relative h-64"><canvas id="chart-cats"></canvas></div>
         </div>
     </div>
 
     {{-- Asesor IA --}}
-    <div class="bg-gradient-to-br from-violet-50 via-white to-orange-50/30 border border-violet-100 rounded-2xl p-5 shadow-sm">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+    <div class="bg-white border border-slate-200/70 border-l-[3px] border-l-violet-500 rounded-2xl p-5">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0">
-                    <svg class="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                <div class="w-9 h-9 rounded-xl bg-violet-50 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                    </svg>
                 </div>
                 <div>
-                    <h3 class="text-base font-bold text-slate-800">Asesor financiero IA</h3>
-                    <p class="text-xs text-slate-500">Análisis local con Ollama · sin enviar datos a la nube</p>
+                    <h3 class="text-sm font-semibold text-slate-900">Asesor financiero IA</h3>
+                    <p class="text-xs text-slate-400 mt-0.5">Análisis local con Ollama · sin enviar datos a la nube</p>
                 </div>
             </div>
-            <button id="btn-ai-refresh" class="hidden text-xs text-slate-500 hover:text-slate-700 underline">Regenerar</button>
+            <button id="btn-ai-refresh" class="hidden text-xs text-violet-600 hover:text-violet-800 font-semibold">Regenerar</button>
         </div>
 
-        <div class="flex flex-wrap gap-2 mb-4">
-            <button data-ai="informe" class="ai-btn bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-xl text-sm font-medium shadow-sm flex items-center gap-2">
-                <span>📊</span> Informe ejecutivo
+        <div class="flex flex-wrap gap-2 mb-5">
+            <button data-ai="informe" class="ai-btn bg-violet-600 hover:bg-violet-700 active:-translate-y-px text-white px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                </svg>
+                Informe ejecutivo
             </button>
-            <button data-ai="forecast" class="ai-btn bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2">
-                <span>🔮</span> Proyección de flujo
+            <button data-ai="forecast" class="ai-btn bg-white hover:bg-slate-50 active:-translate-y-px border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                </svg>
+                Proyección de flujo
             </button>
-            <button data-ai="anomalias" class="ai-btn bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2">
-                <span>🚨</span> Detectar anomalías
+            <button data-ai="anomalias" class="ai-btn bg-white hover:bg-slate-50 active:-translate-y-px border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+                Detectar anomalías
             </button>
-            <button data-ai="compras" class="ai-btn bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2">
-                <span>🛒</span> Asesor de compras
+            <button data-ai="compras" class="ai-btn bg-white hover:bg-slate-50 active:-translate-y-px border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
+                </svg>
+                Asesor de compras
             </button>
         </div>
 
         <div id="ai-loading" class="hidden flex items-center gap-3 text-slate-500 text-sm">
-            <svg class="animate-spin h-5 w-5 text-violet-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            Generando análisis con IA local…
+            <div class="w-5 h-5 border-2 border-violet-200 border-t-violet-600 rounded-full animate-spin flex-shrink-0"></div>
+            Generando análisis con IA local...
         </div>
 
-        <div id="ai-empty" class="text-sm text-slate-400 italic">Selecciona un tipo de análisis arriba.</div>
+        <div id="ai-empty" class="text-sm text-slate-400">Selecciona un tipo de análisis arriba.</div>
 
         <div id="ai-content" class="hidden prose prose-sm max-w-none text-slate-700"></div>
         <p id="ai-meta" class="hidden text-xs text-slate-400 mt-3"></p>

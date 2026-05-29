@@ -7,31 +7,37 @@
 
     <!-- Stats Bar -->
     <div class="grid grid-cols-3 gap-4 mb-6">
-        <div class="bg-white border border-slate-200/60 rounded-2xl p-4 shadow-sm flex items-center gap-4">
-            <div class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+        <div class="bg-white border border-slate-200/70 border-l-[3px] border-l-emerald-500 rounded-2xl p-4 flex items-center gap-4">
+            <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
+                <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                </svg>
             </div>
             <div>
-                <p class="text-xs text-slate-500 font-medium">Total Productos</p>
-                <p id="stat-total-products" class="text-2xl font-bold text-slate-800">—</p>
+                <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Total Productos</p>
+                <p id="stat-total-products" class="text-2xl font-mono font-semibold text-slate-900 mt-1 tabular-nums">—</p>
             </div>
         </div>
-        <div class="bg-white border border-slate-200/60 rounded-2xl p-4 shadow-sm flex items-center gap-4">
-            <div class="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center flex-shrink-0">
-                <svg class="w-5 h-5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <div class="bg-white border border-slate-200/70 border-l-[3px] border-l-rose-500 rounded-2xl p-4 flex items-center gap-4">
+            <div class="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center flex-shrink-0">
+                <svg class="w-5 h-5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
             </div>
             <div>
-                <p class="text-xs text-slate-500 font-medium">Stock Bajo</p>
-                <p id="stat-low-stock" class="text-2xl font-bold text-rose-600">—</p>
+                <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Stock Bajo</p>
+                <p id="stat-low-stock" class="text-2xl font-mono font-semibold text-rose-600 mt-1 tabular-nums">—</p>
             </div>
         </div>
-        <div class="bg-white border border-slate-200/60 rounded-2xl p-4 shadow-sm flex items-center gap-4">
-            <div class="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center flex-shrink-0">
-                <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+        <div class="bg-white border border-slate-200/70 border-l-[3px] border-l-indigo-400 rounded-2xl p-4 flex items-center gap-4">
+            <div class="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center flex-shrink-0">
+                <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                </svg>
             </div>
             <div>
-                <p class="text-xs text-slate-500 font-medium">Categorías</p>
-                <p id="stat-categories" class="text-2xl font-bold text-slate-800">—</p>
+                <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Categorías</p>
+                <p id="stat-categories" class="text-2xl font-mono font-semibold text-slate-900 mt-1 tabular-nums">—</p>
             </div>
         </div>
     </div>
