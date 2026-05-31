@@ -49,10 +49,136 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         // Movimientos
         Route::get('/movements', [\App\Http\Controllers\Api\Inventory\MovementController::class, 'index']);
         Route::post('/movements', [\App\Http\Controllers\Api\Inventory\MovementController::class, 'store']);
+
+        // Unidades de medida
+        Route::get('/unidades-medida', fn() =>
+            response()->json(\App\Models\Inventory\UnidadMedida::where('activa', true)->orderBy('nombre')->get())
+        );
+        Route::post('/unidades-medida', function (\Illuminate\Http\Request $r) {
+            $v = $r->validate(['nombre'=>'required|string|max:50','simbolo'=>'required|string|max:10|unique:unidades_medida,simbolo','tipo'=>'required|in:masa,volumen,longitud,pieza,tiempo,otro']);
+            return response()->json(\App\Models\Inventory\UnidadMedida::create($v), 201);
+        });
+        Route::put('/unidades-medida/{id}', function (\Illuminate\Http\Request $r, string $id) {
+            $u = \App\Models\Inventory\UnidadMedida::findOrFail($id);
+            $v = $r->validate(['nombre'=>'sometimes|string|max:50','simbolo'=>'sometimes|string|max:10|unique:unidades_medida,simbolo,'.$id,'activa'=>'boolean']);
+            $u->update($v);
+            return response()->json($u);
+        });
+
+        // Lotes y series
+        Route::get('/lotes', function (\Illuminate\Http\Request $r) {
+            $query = \App\Models\Inventory\Lote::with([
+                'product:id,name,sku',
+                'almacen:id,nombre,codigo',
+            ])->activos()->conStock()->fefo();
+
+            if ($r->filled('product_id')) { $query->where('product_id', $r->integer('product_id')); }
+            if ($r->filled('almacen_id')) { $query->where('almacen_id', $r->integer('almacen_id')); }
+            if ($r->boolean('vencidos')) {
+                $query->whereNotNull('fecha_vencimiento')->where('fecha_vencimiento', '<', now());
+            }
+            if ($r->filled('vence_en_dias')) {
+                $query->whereNotNull('fecha_vencimiento')
+                      ->where('fecha_vencimiento', '<=', now()->addDays($r->integer('vence_en_dias')));
+            }
+
+            return response()->json($query->paginate(min(100, $r->integer('per_page', 50))));
+        });
+
+        Route::post('/lotes', function (\Illuminate\Http\Request $r) {
+            $v = $r->validate([
+                'product_id'        => 'required|exists:products,id',
+                'almacen_id'        => 'nullable|exists:almacenes,id',
+                'proveedor_id'      => 'nullable|exists:proveedores,id',
+                'numero_lote'       => 'required|string|max:100',
+                'numero_serie'      => 'nullable|string|max:100',
+                'fecha_fabricacion' => 'nullable|date',
+                'fecha_vencimiento' => 'nullable|date',
+                'cantidad_inicial'  => 'required|integer|min:0',
+            ]);
+            $v['cantidad_actual'] = $v['cantidad_inicial'];
+            return response()->json(\App\Models\Inventory\Lote::create($v), 201);
+        });
+
+        // Alertas de stock (reorden automático)
+        Route::get('/alertas',  function (\Illuminate\Http\Request $r) {
+            $query = \App\Models\Inventory\AlertaStock::with([
+                'product:id,name,sku,min_stock,punto_reorden',
+                'almacen:id,nombre,codigo',
+            ])->latest();
+
+            if ($r->filled('estado')) {
+                $query->where('estado', $r->input('estado'));
+            } else {
+                $query->where('estado', 'activa');
+            }
+            if ($r->filled('tipo')) {
+                $query->where('tipo', $r->input('tipo'));
+            }
+
+            return response()->json($query->paginate(min(100, $r->integer('per_page', 50))));
+        });
+
+        Route::patch('/alertas/{id}/resolver', function (string $id) {
+            $alerta = \App\Models\Inventory\AlertaStock::findOrFail($id);
+            $alerta->update(['estado' => 'resuelta']);
+            return response()->json(['message' => 'Alerta resuelta.']);
+        });
+
+        // Almacenes
+        Route::get('/almacenes',                          [\App\Http\Controllers\Api\Inventory\AlmacenController::class, 'index']);
+        Route::post('/almacenes',                         [\App\Http\Controllers\Api\Inventory\AlmacenController::class, 'store']);
+        Route::get('/almacenes/{id}',                     [\App\Http\Controllers\Api\Inventory\AlmacenController::class, 'show']);
+        Route::put('/almacenes/{id}',                     [\App\Http\Controllers\Api\Inventory\AlmacenController::class, 'update']);
+        Route::delete('/almacenes/{id}',                  [\App\Http\Controllers\Api\Inventory\AlmacenController::class, 'destroy']);
+        Route::get('/almacenes/{id}/ubicaciones',         [\App\Http\Controllers\Api\Inventory\AlmacenController::class, 'ubicaciones']);
+        Route::post('/almacenes/{id}/ubicaciones',        [\App\Http\Controllers\Api\Inventory\AlmacenController::class, 'storeUbicacion']);
+        Route::delete('/almacenes/{almacenId}/ubicaciones/{ubicacionId}', [\App\Http\Controllers\Api\Inventory\AlmacenController::class, 'destroyUbicacion']);
+
+        // Transferencias entre almacenes
+        Route::get('/transferencias',                     [\App\Http\Controllers\Api\Inventory\TransferenciaController::class, 'index']);
+        Route::post('/transferencias',                    [\App\Http\Controllers\Api\Inventory\TransferenciaController::class, 'store'])
+            ->middleware('throttle:30,1');
+        Route::get('/transferencias/{id}',                [\App\Http\Controllers\Api\Inventory\TransferenciaController::class, 'show']);
+        Route::post('/transferencias/{id}/enviar',        [\App\Http\Controllers\Api\Inventory\TransferenciaController::class, 'enviar'])
+            ->middleware('throttle:30,1');
+        Route::post('/transferencias/{id}/recibir',       [\App\Http\Controllers\Api\Inventory\TransferenciaController::class, 'recibir'])
+            ->middleware('throttle:30,1');
+        Route::delete('/transferencias/{id}',             [\App\Http\Controllers\Api\Inventory\TransferenciaController::class, 'destroy']);
+
+        // Inventario Físico
+        Route::get('/inventario-fisico',                  [\App\Http\Controllers\Api\Inventory\InventarioFisicoController::class, 'index']);
+        Route::post('/inventario-fisico',                 [\App\Http\Controllers\Api\Inventory\InventarioFisicoController::class, 'store'])
+            ->middleware('throttle:10,1');
+        Route::get('/inventario-fisico/{id}',             [\App\Http\Controllers\Api\Inventory\InventarioFisicoController::class, 'show']);
+        Route::patch('/inventario-fisico/{id}/items/{itemId}', [\App\Http\Controllers\Api\Inventory\InventarioFisicoController::class, 'registrarConteo']);
+        Route::post('/inventario-fisico/{id}/aplicar',   [\App\Http\Controllers\Api\Inventory\InventarioFisicoController::class, 'aplicar'])
+            ->middleware('throttle:5,1');
+        Route::delete('/inventario-fisico/{id}',          [\App\Http\Controllers\Api\Inventory\InventarioFisicoController::class, 'destroy']);
     });
 
     // ─── Módulo de Finanzas ──────────────────────────────────
     Route::middleware('service:finance')->prefix('finance')->group(function () {
+
+        // Centros de costo
+        Route::get('/centros-costo', fn() =>
+            response()->json(\App\Models\Finance\CentroCosto::where('activo', true)->orderBy('codigo')->get())
+        );
+        Route::post('/centros-costo', function (\Illuminate\Http\Request $r) {
+            $v = $r->validate(['codigo'=>'required|string|max:20|unique:centros_costo,codigo','nombre'=>'required|string|max:100','descripcion'=>'nullable|string|max:500']);
+            return response()->json(\App\Models\Finance\CentroCosto::create($v), 201);
+        });
+        Route::put('/centros-costo/{id}', function (\Illuminate\Http\Request $r, string $id) {
+            $c = \App\Models\Finance\CentroCosto::findOrFail($id);
+            $v = $r->validate(['codigo'=>'sometimes|string|max:20|unique:centros_costo,codigo,'.$id,'nombre'=>'sometimes|string|max:100','descripcion'=>'nullable|string|max:500','activo'=>'boolean']);
+            $c->update($v);
+            return response()->json($c);
+        });
+        Route::delete('/centros-costo/{id}', function (string $id) {
+            $c = \App\Models\Finance\CentroCosto::findOrFail($id);
+            $c->update(['activo' => false]);
+            return response()->json(['message' => 'Centro de costo desactivado.']);
+        });
 
         // Catálogos
         Route::get('/monedas',                 [\App\Http\Controllers\Api\Finance\MonedaController::class, 'index']);
@@ -118,13 +244,75 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::post('/cxp/{id}/pagar',         [\App\Http\Controllers\Api\Finance\CxPController::class, 'pagar'])
             ->middleware('throttle:30,1');
 
+        // Devoluciones de compra
+        Route::get('/devoluciones-compra',          [\App\Http\Controllers\Api\Finance\DevolucionCompraController::class, 'index']);
+        Route::post('/devoluciones-compra',         [\App\Http\Controllers\Api\Finance\DevolucionCompraController::class, 'store'])
+            ->middleware('throttle:30,1');
+        Route::get('/devoluciones-compra/{id}',     [\App\Http\Controllers\Api\Finance\DevolucionCompraController::class, 'show']);
+
+        // Devoluciones de venta
+        Route::get('/devoluciones-venta',           [\App\Http\Controllers\Api\Finance\DevolucionVentaController::class, 'index']);
+        Route::post('/devoluciones-venta',          [\App\Http\Controllers\Api\Finance\DevolucionVentaController::class, 'store'])
+            ->middleware('throttle:30,1');
+        Route::get('/devoluciones-venta/{id}',      [\App\Http\Controllers\Api\Finance\DevolucionVentaController::class, 'show']);
+
         // Presupuestos
         Route::get('/presupuestos',            [\App\Http\Controllers\Api\Finance\PresupuestoController::class, 'index']);
         Route::post('/presupuestos',           [\App\Http\Controllers\Api\Finance\PresupuestoController::class, 'store']);
         Route::delete('/presupuestos/{id}',    [\App\Http\Controllers\Api\Finance\PresupuestoController::class, 'destroy']);
 
+        // Conciliación bancaria
+        Route::get('/conciliaciones',                         [\App\Http\Controllers\Api\Finance\ConciliacionController::class, 'index']);
+        Route::post('/conciliaciones',                        [\App\Http\Controllers\Api\Finance\ConciliacionController::class, 'store'])
+            ->middleware('throttle:10,1');
+        Route::get('/conciliaciones/{id}',                    [\App\Http\Controllers\Api\Finance\ConciliacionController::class, 'show']);
+        Route::patch('/conciliaciones/{id}/items/{itemId}',   [\App\Http\Controllers\Api\Finance\ConciliacionController::class, 'toggleItem']);
+        Route::post('/conciliaciones/{id}/cerrar',            [\App\Http\Controllers\Api\Finance\ConciliacionController::class, 'cerrar'])
+            ->middleware('throttle:10,1');
+
+        // Reportes financieros (read-only, caché 15 min)
+        Route::middleware('throttle:20,1')->group(function () {
+            Route::get('/reportes/pyg',          [\App\Http\Controllers\Api\Finance\ReporteController::class, 'pyg']);
+            Route::get('/reportes/flujo-caja',   [\App\Http\Controllers\Api\Finance\ReporteController::class, 'flujoCaja']);
+            Route::get('/reportes/cuentas-saldo',[\App\Http\Controllers\Api\Finance\ReporteController::class, 'cuentasSaldo']);
+            Route::get('/reportes/aging-cxc',    [\App\Http\Controllers\Api\Finance\ReporteController::class, 'agingCxC']);
+            Route::get('/reportes/aging-cxp',    [\App\Http\Controllers\Api\Finance\ReporteController::class, 'agingCxP']);
+        });
+
         // KPIs / Estadísticas
         Route::get('/stats',                   [\App\Http\Controllers\Api\Finance\FinanceStatsController::class, 'index']);
+
+        // Activos fijos
+        Route::get('/activos-fijos',            [\App\Http\Controllers\Api\Finance\ActivoFijoController::class, 'index']);
+        Route::post('/activos-fijos',           [\App\Http\Controllers\Api\Finance\ActivoFijoController::class, 'store']);
+        Route::get('/activos-fijos/{id}',       [\App\Http\Controllers\Api\Finance\ActivoFijoController::class, 'show']);
+        Route::put('/activos-fijos/{id}',       [\App\Http\Controllers\Api\Finance\ActivoFijoController::class, 'update']);
+
+        // Períodos contables
+        Route::get('/periodos',                 [\App\Http\Controllers\Api\Finance\PeriodoContableController::class, 'index']);
+        Route::post('/periodos',                [\App\Http\Controllers\Api\Finance\PeriodoContableController::class, 'store']);
+        Route::post('/periodos/{id}/cerrar',    [\App\Http\Controllers\Api\Finance\PeriodoContableController::class, 'cerrar'])
+            ->middleware('throttle:5,1');
+        Route::post('/periodos/{id}/reabrir',   [\App\Http\Controllers\Api\Finance\PeriodoContableController::class, 'reabrir'])
+            ->middleware('throttle:5,1');
+
+        // DIOT
+        Route::get('/reportes/diot',            [\App\Http\Controllers\Api\Finance\DiotController::class, 'index'])
+            ->middleware('throttle:10,1');
+
+        // Catálogo de cuentas contables
+        Route::get('/cuentas-contables',          [\App\Http\Controllers\Api\Finance\CuentaContableController::class, 'index']);
+        Route::get('/cuentas-contables/flat',     [\App\Http\Controllers\Api\Finance\CuentaContableController::class, 'flat']);
+        Route::post('/cuentas-contables',         [\App\Http\Controllers\Api\Finance\CuentaContableController::class, 'store']);
+        Route::put('/cuentas-contables/{id}',     [\App\Http\Controllers\Api\Finance\CuentaContableController::class, 'update']);
+
+        // Asientos contables
+        Route::get('/asientos',                   [\App\Http\Controllers\Api\Finance\CuentaContableController::class, 'indexAsientos']);
+        Route::post('/asientos',                  [\App\Http\Controllers\Api\Finance\CuentaContableController::class, 'storeAsiento'])
+            ->middleware('throttle:30,1');
+        Route::get('/asientos/{id}',              [\App\Http\Controllers\Api\Finance\CuentaContableController::class, 'showAsiento']);
+        Route::delete('/asientos/{id}',           [\App\Http\Controllers\Api\Finance\CuentaContableController::class, 'destroyAsiento']);
+        Route::post('/asientos/{id}/cancelar',    [\App\Http\Controllers\Api\Finance\CuentaContableController::class, 'cancelarAsiento']);
 
         // IA — Asesor financiero (rate-limited)
         Route::middleware('throttle:20,1')->group(function () {

@@ -157,6 +157,10 @@
         <button data-tab="cxc" class="tab-btn pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300 transition-colors whitespace-nowrap">Por cobrar</button>
         <button data-tab="cxp" class="tab-btn pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300 transition-colors whitespace-nowrap">Por pagar</button>
         <button data-tab="presupuestos" class="tab-btn pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300 transition-colors whitespace-nowrap">Presupuestos</button>
+        <button data-tab="devoluciones" class="tab-btn pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300 transition-colors whitespace-nowrap">Devoluciones</button>
+        <button data-tab="conciliacion" class="tab-btn pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300 transition-colors whitespace-nowrap">Conciliación</button>
+        <button data-tab="reportes" class="tab-btn pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300 transition-colors whitespace-nowrap">Reportes</button>
+        <button data-tab="activos" class="tab-btn pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300 transition-colors whitespace-nowrap">Activos Fijos</button>
     </div>
 
     @php $th = 'px-5 py-3 text-[11px] font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-widest'; @endphp
@@ -283,6 +287,186 @@
                 </thead>
                 <tbody id="tbody-cxp" class="divide-y divide-slate-100 dark:divide-zinc-800"><tr><td colspan="7" class="px-5 py-6 text-center text-slate-400 dark:text-zinc-500">Cargando...</td></tr></tbody>
             </table>
+        </div>
+    </div>
+
+    {{-- TAB: DEVOLUCIONES --}}
+    <div id="tab-devoluciones" class="tab-content hidden space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {{-- Devoluciones de Compra --}}
+            <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-sm font-semibold text-slate-700 dark:text-zinc-300">Devoluciones de Compra</h3>
+                    <button id="btn-nueva-dev-compra" class="bg-rose-600 hover:bg-rose-700 active:-translate-y-px text-white px-3 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                        Nueva devolución
+                    </button>
+                </div>
+                <div class="bg-white dark:bg-zinc-900 border border-slate-200/70 dark:border-zinc-800 rounded-2xl overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-slate-50 dark:bg-zinc-800/60 border-b border-slate-200 dark:border-zinc-700">
+                                <tr>
+                                    <th class="{{ $th ?? 'px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-widest' }}">Proveedor</th>
+                                    <th class="{{ $th ?? 'px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-widest' }}">Fecha</th>
+                                    <th class="{{ $th ?? 'px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-widest' }} text-right">Total</th>
+                                    <th class="{{ $th ?? 'px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-widest' }}">Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-dev-compras" class="divide-y divide-slate-100 dark:divide-zinc-800">
+                                <tr><td colspan="4" class="px-5 py-6 text-center text-slate-400 dark:text-zinc-500">Cargando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {{-- Devoluciones de Venta --}}
+            <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-sm font-semibold text-slate-700 dark:text-zinc-300">Devoluciones de Venta</h3>
+                    <button id="btn-nueva-dev-venta" class="bg-rose-600 hover:bg-rose-700 active:-translate-y-px text-white px-3 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                        Nueva devolución
+                    </button>
+                </div>
+                <div class="bg-white dark:bg-zinc-900 border border-slate-200/70 dark:border-zinc-800 rounded-2xl overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-slate-50 dark:bg-zinc-800/60 border-b border-slate-200 dark:border-zinc-700">
+                                <tr>
+                                    <th class="{{ $th ?? 'px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-widest' }}">Venta</th>
+                                    <th class="{{ $th ?? 'px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-widest' }}">Fecha</th>
+                                    <th class="{{ $th ?? 'px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-widest' }} text-right">Total</th>
+                                    <th class="{{ $th ?? 'px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-widest' }}">Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-dev-ventas" class="divide-y divide-slate-100 dark:divide-zinc-800">
+                                <tr><td colspan="4" class="px-5 py-6 text-center text-slate-400 dark:text-zinc-500">Cargando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- TAB: CONCILIACIÓN --}}
+    <div id="tab-conciliacion" class="tab-content hidden space-y-4">
+        <div class="flex justify-between items-center">
+            <h3 class="text-sm font-semibold text-slate-700 dark:text-zinc-300">Conciliaciones bancarias</h3>
+            <button id="btn-nueva-conciliacion" class="bg-amber-600 hover:bg-amber-700 active:-translate-y-px text-white px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                Nueva conciliación
+            </button>
+        </div>
+        <div class="bg-white dark:bg-zinc-900 border border-slate-200/70 dark:border-zinc-800 rounded-2xl overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-slate-50 dark:bg-zinc-800/60 border-b border-slate-200 dark:border-zinc-700">
+                        <tr>
+                            <th class="{{ $th ?? 'px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-widest' }}">Cuenta</th>
+                            <th class="{{ $th ?? 'px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-widest' }}">Período</th>
+                            <th class="{{ $th ?? 'px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-widest' }} text-right">Saldo banco</th>
+                            <th class="{{ $th ?? 'px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-widest' }} text-right">Saldo sistema</th>
+                            <th class="{{ $th ?? 'px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-widest' }} text-right">Diferencia</th>
+                            <th class="{{ $th ?? 'px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-widest' }}">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-conciliaciones" class="divide-y divide-slate-100 dark:divide-zinc-800">
+                        <tr><td colspan="6" class="px-5 py-6 text-center text-slate-400 dark:text-zinc-500">Cargando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {{-- TAB: REPORTES --}}
+    <div id="tab-reportes" class="tab-content hidden space-y-6">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Desde</label>
+                <input type="date" id="rep-desde" class="w-full rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm px-3 py-2">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Hasta</label>
+                <input type="date" id="rep-hasta" class="w-full rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm px-3 py-2">
+            </div>
+            <div class="flex items-end gap-2">
+                <button id="btn-rep-pyg" class="flex-1 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-all">Ver P&G</button>
+                <button id="btn-rep-flujo" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-all">Flujo Caja</button>
+            </div>
+        </div>
+
+        {{-- Estado de Resultados --}}
+        <div id="rep-pyg-container" class="hidden space-y-4">
+            <h3 class="text-sm font-semibold text-slate-700 dark:text-zinc-300">Estado de Resultados (P&G)</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200/70 dark:border-emerald-800/40 rounded-2xl p-4">
+                    <p class="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">Ingresos</p>
+                    <p id="rep-pyg-ingresos" class="text-2xl font-mono font-semibold text-emerald-700 dark:text-emerald-300 mt-2">—</p>
+                </div>
+                <div class="bg-rose-50 dark:bg-rose-900/20 border border-rose-200/70 dark:border-rose-800/40 rounded-2xl p-4">
+                    <p class="text-[11px] font-semibold text-rose-600 dark:text-rose-400 uppercase tracking-widest">Egresos</p>
+                    <p id="rep-pyg-egresos" class="text-2xl font-mono font-semibold text-rose-700 dark:text-rose-300 mt-2">—</p>
+                </div>
+                <div class="bg-white dark:bg-zinc-900 border border-slate-200/70 dark:border-zinc-800 rounded-2xl p-4">
+                    <p class="text-[11px] font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Utilidad</p>
+                    <p id="rep-pyg-utilidad" class="text-2xl font-mono font-semibold text-slate-900 dark:text-zinc-50 mt-2">—</p>
+                    <p id="rep-pyg-margen" class="text-xs font-mono text-slate-400 mt-1">Margen —%</p>
+                </div>
+            </div>
+        </div>
+
+        {{-- Aging CxC / CxP --}}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-sm font-semibold text-slate-700 dark:text-zinc-300">Antigüedad CxC</h3>
+                    <button id="btn-rep-aging-cxc" class="text-xs font-semibold text-amber-600 hover:text-amber-700">Actualizar</button>
+                </div>
+                <div id="rep-aging-cxc" class="bg-white dark:bg-zinc-900 border border-slate-200/70 dark:border-zinc-800 rounded-2xl p-4 text-sm text-slate-400 dark:text-zinc-500">
+                    Haz clic en Actualizar.
+                </div>
+            </div>
+            <div>
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-sm font-semibold text-slate-700 dark:text-zinc-300">Antigüedad CxP</h3>
+                    <button id="btn-rep-aging-cxp" class="text-xs font-semibold text-amber-600 hover:text-amber-700">Actualizar</button>
+                </div>
+                <div id="rep-aging-cxp" class="bg-white dark:bg-zinc-900 border border-slate-200/70 dark:border-zinc-800 rounded-2xl p-4 text-sm text-slate-400 dark:text-zinc-500">
+                    Haz clic en Actualizar.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- TAB: ACTIVOS FIJOS --}}
+    <div id="tab-activos" class="tab-content hidden space-y-4">
+        <div class="flex justify-between items-center">
+            <h3 class="text-sm font-semibold text-slate-700 dark:text-zinc-300">Activos fijos</h3>
+            <button id="btn-nuevo-activo" class="bg-amber-600 hover:bg-amber-700 active:-translate-y-px text-white px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                Nuevo activo
+            </button>
+        </div>
+        <div class="bg-white dark:bg-zinc-900 border border-slate-200/70 dark:border-zinc-800 rounded-2xl overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-slate-50 dark:bg-zinc-800/60 border-b border-slate-200 dark:border-zinc-700">
+                        <tr>
+                            <th class="{{ $th ?? 'px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-widest' }}">Nombre</th>
+                            <th class="{{ $th ?? 'px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-widest' }}">Categoría</th>
+                            <th class="{{ $th ?? 'px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-widest' }} text-right">Costo Orig.</th>
+                            <th class="{{ $th ?? 'px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-widest' }} text-right">Valor Libro</th>
+                            <th class="{{ $th ?? 'px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-widest' }}">Método</th>
+                            <th class="{{ $th ?? 'px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-widest' }}">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-activos" class="divide-y divide-slate-100 dark:divide-zinc-800">
+                        <tr><td colspan="6" class="px-5 py-6 text-center text-slate-400 dark:text-zinc-500">Cargando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 

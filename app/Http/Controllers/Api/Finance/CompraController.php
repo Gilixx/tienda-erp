@@ -11,6 +11,7 @@ use App\Models\Finance\CuentaPorPagar;
 use App\Models\Finance\Impuesto;
 use App\Models\Finance\Proveedor;
 use App\Models\Finance\Transaccion;
+use App\Models\Inventory\ProductStock;
 use App\Models\InventoryMovement;
 use App\Models\Product;
 use App\Services\CurrencyService;
@@ -139,7 +140,8 @@ class CompraController extends Controller
     public function recibir(Request $request, string $id, CurrencyService $fx)
     {
         $validated = $request->validate([
-            'cuenta_id' => 'nullable|exists:cuentas,id',
+            'cuenta_id'  => 'nullable|exists:cuentas,id',
+            'almacen_id' => 'nullable|exists:almacenes,id',
         ]);
 
         try {
@@ -155,12 +157,19 @@ class CompraController extends Controller
                     return response()->json(['error' => 'Se requiere cuenta_id para compras de contado.'], 422);
                 }
 
+                // Determinar almacén destino (si no se especifica, usar el principal)
+                $almacenId = $validated['almacen_id'] ?? null;
+                if (! $almacenId) {
+                    $almacenPrincipal = \App\Models\Inventory\Almacen::where('es_principal', true)->first();
+                    $almacenId = $almacenPrincipal?->id;
+                }
+
                 foreach ($compra->items as $item) {
                     $product = Product::lockForUpdate()->findOrFail($item->product_id);
 
-                    $stockActual = $product->stock;
-                    $costoActual = (float) $product->cost;
-                    $entrada     = (float) $item->cantidad;
+                    $stockActual  = $product->stock;
+                    $costoActual  = (float) $product->cost;
+                    $entrada      = (float) $item->cantidad;
                     $costoEntrada = (float) $item->costo_unit;
 
                     $nuevoCosto = ($stockActual + $entrada) > 0
@@ -170,13 +179,33 @@ class CompraController extends Controller
                     $product->update(['cost' => round($nuevoCosto, 4)]);
                     $product->increment('stock', (int) $entrada);
 
+                    // Actualizar stock por almacén
+                    if ($almacenId) {
+                        $stockRow = ProductStock::lockForUpdate()
+                            ->where('product_id', $product->id)
+                            ->where('almacen_id', $almacenId)
+                            ->first();
+
+                        if ($stockRow) {
+                            $stockRow->increment('cantidad', (int) $entrada);
+                            $stockRow->touch();
+                        } else {
+                            ProductStock::create([
+                                'product_id' => $product->id,
+                                'almacen_id' => $almacenId,
+                                'cantidad'   => (int) $entrada,
+                            ]);
+                        }
+                    }
+
                     InventoryMovement::create([
-                        'product_id' => $product->id,
-                        'user_id'    => auth()->id(),
-                        'type'       => 'in',
-                        'quantity'   => (int) $entrada,
-                        'reference'  => 'COMPRA-' . $compra->id,
-                        'notes'      => 'Recepción de compra a ' . ($compra->proveedor->nombre ?? '—'),
+                        'product_id'  => $product->id,
+                        'almacen_id'  => $almacenId,
+                        'user_id'     => auth()->id(),
+                        'type'        => 'in',
+                        'quantity'    => (int) $entrada,
+                        'reference'   => 'COMPRA-' . $compra->id,
+                        'notes'       => 'Recepción de compra a ' . ($compra->proveedor->nombre ?? '—'),
                     ]);
                 }
 

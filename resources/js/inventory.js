@@ -135,13 +135,15 @@ document.addEventListener('DOMContentLoaded', () => {
     async function init() {
         showLoading();
         try {
-            await Promise.all([fetchCategories(), fetchProducts(), fetchMovements()]);
+            await Promise.all([fetchCategories(), fetchProducts(), fetchMovements(), fetchAlmacenes()]);
             renderStats();
             renderCategories();
             renderProducts();
             renderMovements();
             populateCategorySelects();
             populateProductSelects();
+            // Cargar alertas en background para mostrar badge
+            fetchAndRenderAlertas().catch(() => {});
         } catch (error) {
             console.error('Error inicializando inventario', error);
             showToast('Error al cargar los datos del inventario', 'error');
@@ -532,26 +534,277 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // ─── Tabs ──────────────────────────────────────────────────
-    function switchTab(tab) {
-        state.currentTab = tab;
-        const isProducts = tab === 'products';
-        productsSection.classList.toggle('hidden', !isProducts);
-        movementsSection.classList.toggle('hidden', isProducts);
+    // ─── Almacenes ─────────────────────────────────────────────
+    let almacenes = [];
 
-        tabProductsBtn.classList.toggle('border-emerald-500', isProducts);
-        tabProductsBtn.classList.toggle('text-emerald-600', isProducts);
-        tabProductsBtn.classList.toggle('border-transparent', !isProducts);
-        tabProductsBtn.classList.toggle('text-slate-500', !isProducts);
-
-        tabMovementsBtn.classList.toggle('border-emerald-500', !isProducts);
-        tabMovementsBtn.classList.toggle('text-emerald-600', !isProducts);
-        tabMovementsBtn.classList.toggle('border-transparent', isProducts);
-        tabMovementsBtn.classList.toggle('text-slate-500', isProducts);
+    async function fetchAlmacenes() {
+        const { data } = await api.get('/api/inventory/almacenes');
+        almacenes = data;
+        populateAlmacenSelects();
     }
 
-    tabProductsBtn?.addEventListener('click', () => switchTab('products'));
-    tabMovementsBtn?.addEventListener('click', () => switchTab('movements'));
+    function populateAlmacenSelects() {
+        const sel = document.getElementById('movement-almacen');
+        if (sel) {
+            sel.innerHTML = almacenes.map(a =>
+                `<option value="${a.id}">${esc(a.nombre)} (${esc(a.codigo)})</option>`
+            ).join('');
+        }
+    }
+
+    function renderAlmacenesGrid() {
+        const grid = document.getElementById('almacenes-grid');
+        if (!grid) return;
+
+        if (!almacenes.length) {
+            grid.innerHTML = '<p class="text-slate-400 dark:text-zinc-500 text-sm col-span-3">No hay almacenes registrados.</p>';
+            return;
+        }
+
+        grid.innerHTML = almacenes.map(a => `
+            <div class="bg-white dark:bg-zinc-900 border border-slate-200/70 dark:border-zinc-800 border-l-[3px] border-l-emerald-500 rounded-2xl p-5">
+                <div class="flex items-start justify-between mb-3">
+                    <div>
+                        <p class="font-semibold text-slate-800 dark:text-zinc-100">${esc(a.nombre)}</p>
+                        <p class="text-xs text-slate-400 dark:text-zinc-500 font-mono mt-0.5">${esc(a.codigo)}</p>
+                    </div>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${a.activo ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}">
+                        ${a.activo ? 'Activo' : 'Inactivo'}
+                    </span>
+                </div>
+                ${a.descripcion ? `<p class="text-xs text-slate-500 dark:text-zinc-400 mb-3">${esc(a.descripcion)}</p>` : ''}
+                <div class="flex gap-4 text-xs text-slate-400 dark:text-zinc-500">
+                    <span>${a.total_productos ?? '—'} SKUs con stock</span>
+                    ${a.es_principal ? '<span class="text-emerald-600 font-semibold">Principal</span>' : ''}
+                </div>
+            </div>`).join('');
+    }
+
+    document.getElementById('btn-nuevo-almacen')?.addEventListener('click', async () => {
+        const nombre = prompt('Nombre del almacén:');
+        if (!nombre) return;
+        const codigo = prompt('Código (ej: BODEGA-A):');
+        if (!codigo) return;
+        try {
+            await api.post('/api/inventory/almacenes', { nombre, codigo });
+            await fetchAlmacenes();
+            renderAlmacenesGrid();
+            showToast('Almacén creado correctamente');
+        } catch (err) {
+            showToast(err.response?.data?.errors ? Object.values(err.response.data.errors).flat().join(' ') : 'Error al crear almacén', 'error');
+        }
+    });
+
+    // ─── Transferencias ────────────────────────────────────────
+    async function fetchAndRenderTransferencias() {
+        try {
+            const { data } = await api.get('/api/inventory/transferencias');
+            const tbody = document.getElementById('tbody-transferencias');
+            if (!tbody) return;
+            const items = data.data ?? data;
+            if (!items.length) {
+                tbody.innerHTML = '<tr><td colspan="7" class="px-5 py-6 text-center text-slate-400">No hay transferencias registradas.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = items.map(t => {
+                const estadoBadge = {
+                    borrador: 'bg-slate-100 text-slate-600',
+                    en_transito: 'bg-amber-100 text-amber-700',
+                    recibida: 'bg-emerald-100 text-emerald-700',
+                    cancelada: 'bg-rose-100 text-rose-700',
+                }[t.estado] ?? 'bg-slate-100 text-slate-600';
+
+                return `<tr class="hover:bg-slate-50 dark:hover:bg-zinc-800/50 transition-colors">
+                    <td class="px-5 py-3.5 text-sm text-slate-600 dark:text-zinc-300">${t.fecha ?? '—'}</td>
+                    <td class="px-5 py-3.5 text-sm font-medium">${esc(t.almacen_origen?.nombre ?? '—')}</td>
+                    <td class="px-5 py-3.5 text-sm font-medium">${esc(t.almacen_destino?.nombre ?? '—')}</td>
+                    <td class="px-5 py-3.5 text-center text-sm">${t.items_count ?? '—'}</td>
+                    <td class="px-5 py-3.5"><span class="text-xs font-semibold px-2 py-0.5 rounded-full ${estadoBadge}">${t.estado}</span></td>
+                    <td class="px-5 py-3.5 text-sm text-slate-500 dark:text-zinc-400">${esc(t.user?.name ?? '—')}</td>
+                    <td class="px-5 py-3.5 text-right">
+                        ${t.estado === 'borrador' ? `<button onclick="window._enviarTransferencia(${t.id})" class="text-xs bg-emerald-600 text-white px-3 py-1 rounded-lg hover:bg-emerald-700 transition-colors">Enviar</button>` : ''}
+                        ${t.estado === 'en_transito' ? `<button onclick="window._recibirTransferencia(${t.id})" class="text-xs bg-indigo-600 text-white px-3 py-1 rounded-lg hover:bg-indigo-700 transition-colors">Recibir</button>` : ''}
+                    </td>
+                </tr>`;
+            }).join('');
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    window._enviarTransferencia = async (id) => {
+        if (!confirm('¿Confirmar envío? Se descontará el stock del almacén origen.')) return;
+        try {
+            await api.post(`/api/inventory/transferencias/${id}/enviar`);
+            showToast('Transferencia enviada. En tránsito.');
+            await fetchAndRenderTransferencias();
+            await fetchProducts();
+            renderProducts();
+        } catch (err) {
+            showToast(err.response?.data?.error ?? 'Error al enviar', 'error');
+        }
+    };
+
+    window._recibirTransferencia = async (id) => {
+        if (!confirm('¿Confirmar recepción? Se acreditará el stock en el almacén destino.')) return;
+        try {
+            await api.post(`/api/inventory/transferencias/${id}/recibir`, { items: [] });
+            showToast('Transferencia recibida.');
+            await fetchAndRenderTransferencias();
+            await fetchProducts();
+            renderProducts();
+        } catch (err) {
+            showToast(err.response?.data?.error ?? 'Error al recibir', 'error');
+        }
+    };
+
+    // ─── Inventario Físico ─────────────────────────────────────
+    async function fetchAndRenderInvFisico() {
+        try {
+            const { data } = await api.get('/api/inventory/inventario-fisico');
+            const tbody = document.getElementById('tbody-inv-fisico');
+            if (!tbody) return;
+            const items = data.data ?? data;
+            if (!items.length) {
+                tbody.innerHTML = '<tr><td colspan="7" class="px-5 py-6 text-center text-slate-400">No hay sesiones de inventario.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = items.map(s => {
+                const estadoBadge = { abierto: 'bg-amber-100 text-amber-700', cerrado: 'bg-indigo-100 text-indigo-700', aplicado: 'bg-emerald-100 text-emerald-700' }[s.estado] ?? '';
+                return `<tr class="hover:bg-slate-50 dark:hover:bg-zinc-800/50 transition-colors">
+                    <td class="px-5 py-3.5 text-sm font-medium">${esc(s.almacen?.nombre ?? '—')}</td>
+                    <td class="px-5 py-3.5 text-sm text-slate-500">${new Date(s.fecha_apertura).toLocaleString('es-MX')}</td>
+                    <td class="px-5 py-3.5 text-sm text-slate-500">${s.fecha_cierre ? new Date(s.fecha_cierre).toLocaleString('es-MX') : '—'}</td>
+                    <td class="px-5 py-3.5 text-right font-mono text-sm">${s.diferencia_total_valor != null ? '$' + fmt(s.diferencia_total_valor) : '—'}</td>
+                    <td class="px-5 py-3.5"><span class="text-xs font-semibold px-2 py-0.5 rounded-full ${estadoBadge}">${s.estado}</span></td>
+                    <td class="px-5 py-3.5 text-sm text-slate-500">${esc(s.user?.name ?? '—')}</td>
+                    <td class="px-5 py-3.5 text-right">
+                        ${s.estado === 'abierto' ? `<button onclick="window._aplicarInvFisico(${s.id})" class="text-xs bg-emerald-600 text-white px-3 py-1 rounded-lg hover:bg-emerald-700 transition-colors">Aplicar</button>` : ''}
+                    </td>
+                </tr>`;
+            }).join('');
+        } catch (err) { console.error(err); }
+    }
+
+    window._aplicarInvFisico = async (id) => {
+        if (!confirm('¿Aplicar inventario físico? Se generarán ajustes de stock automáticos.')) return;
+        try {
+            await api.post(`/api/inventory/inventario-fisico/${id}/aplicar`);
+            showToast('Inventario físico aplicado. Stock ajustado.');
+            await fetchAndRenderInvFisico();
+            await fetchProducts();
+            renderProducts();
+        } catch (err) {
+            showToast(err.response?.data?.error ?? 'Error al aplicar', 'error');
+        }
+    };
+
+    document.getElementById('btn-nueva-sesion-inv')?.addEventListener('click', async () => {
+        if (!almacenes.length) { showToast('No hay almacenes disponibles', 'warning'); return; }
+        const options = almacenes.map(a => `${a.id}: ${a.nombre}`).join('\n');
+        const input = prompt(`Selecciona almacén por ID:\n${options}`);
+        const almacenId = parseInt(input);
+        if (!almacenId) return;
+        try {
+            await api.post('/api/inventory/inventario-fisico', { almacen_id: almacenId });
+            showToast('Sesión de inventario abierta. Se tomó snapshot del stock actual.');
+            await fetchAndRenderInvFisico();
+        } catch (err) {
+            showToast(err.response?.data?.error ?? 'Error al abrir sesión', 'error');
+        }
+    });
+
+    // ─── Alertas de Stock ──────────────────────────────────────
+    async function fetchAndRenderAlertas() {
+        try {
+            const { data } = await api.get('/api/inventory/alertas');
+            const tbody  = document.getElementById('tbody-alertas');
+            const count  = document.getElementById('alertas-count');
+            const badge  = document.getElementById('alertas-badge');
+            const items  = data.data ?? data;
+            const total  = data.total ?? items.length;
+
+            if (count) count.textContent = `${total} alerta${total !== 1 ? 's' : ''}`;
+            if (badge && total > 0) badge.classList.remove('hidden');
+
+            if (!tbody) return;
+            if (!items.length) {
+                tbody.innerHTML = '<tr><td colspan="7" class="px-5 py-6 text-center text-emerald-600 dark:text-emerald-400">Sin alertas activas. Stock saludable.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = items.map(a => {
+                const tipo = a.tipo === 'bajo_minimo' ? 'Bajo mínimo' : 'Punto reorden';
+                return `<tr class="hover:bg-slate-50 dark:hover:bg-zinc-800/50">
+                    <td class="px-5 py-3 text-sm font-mono text-slate-500">${esc(a.product?.sku ?? '—')}</td>
+                    <td class="px-5 py-3 text-sm font-medium">${esc(a.product?.name ?? '—')}</td>
+                    <td class="px-5 py-3 text-sm text-slate-500">${esc(a.almacen?.nombre ?? 'Global')}</td>
+                    <td class="px-5 py-3"><span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">${tipo}</span></td>
+                    <td class="px-5 py-3 text-center font-mono text-rose-600 font-semibold">${a.stock_actual}</td>
+                    <td class="px-5 py-3 text-center font-mono text-slate-500">${a.stock_minimo}</td>
+                    <td class="px-5 py-3 text-right">
+                        <button onclick="window._resolverAlerta(${a.id}, this)" class="text-xs text-emerald-600 hover:text-emerald-700 font-semibold">Resolver</button>
+                    </td>
+                </tr>`;
+            }).join('');
+        } catch (err) { console.error(err); }
+    }
+
+    window._resolverAlerta = async (id, btn) => {
+        btn.disabled = true;
+        try {
+            await api.patch(`/api/inventory/alertas/${id}/resolver`);
+            btn.closest('tr').remove();
+            showToast('Alerta resuelta.');
+        } catch { btn.disabled = false; }
+    };
+
+    // ─── Tabs (actualizado con nuevos tabs) ────────────────────
+    const allSections = {
+        products:      document.getElementById('section-products'),
+        movements:     document.getElementById('section-movements'),
+        almacenes:     document.getElementById('section-almacenes'),
+        transferencias: document.getElementById('section-transferencias'),
+        'inv-fisico':  document.getElementById('section-inv-fisico'),
+        alertas:       document.getElementById('section-alertas'),
+    };
+
+    const allTabBtns = {
+        products:      tabProductsBtn,
+        movements:     tabMovementsBtn,
+        almacenes:     document.getElementById('tab-almacenes'),
+        transferencias: document.getElementById('tab-transferencias'),
+        'inv-fisico':  document.getElementById('tab-inv-fisico'),
+        alertas:       document.getElementById('tab-alertas'),
+    };
+
+    function switchTab(tab) {
+        state.currentTab = tab;
+
+        Object.entries(allSections).forEach(([key, el]) => {
+            if (!el) return;
+            el.classList.toggle('hidden', key !== tab);
+        });
+
+        Object.entries(allTabBtns).forEach(([key, btn]) => {
+            if (!btn) return;
+            const isActive = key === tab;
+            btn.classList.toggle('border-emerald-500', isActive);
+            btn.classList.toggle('text-emerald-600', isActive);
+            btn.classList.toggle('dark:text-emerald-400', isActive);
+            btn.classList.toggle('border-transparent', !isActive);
+            btn.classList.toggle('text-slate-500', !isActive);
+        });
+
+        // Lazy-load datos del tab activo
+        if (tab === 'almacenes') renderAlmacenesGrid();
+        if (tab === 'transferencias') fetchAndRenderTransferencias();
+        if (tab === 'inv-fisico') fetchAndRenderInvFisico();
+        if (tab === 'alertas') fetchAndRenderAlertas();
+    }
+
+    Object.entries(allTabBtns).forEach(([key, btn]) => {
+        btn?.addEventListener('click', () => switchTab(key));
+    });
 
     // ─── Search ────────────────────────────────────────────────
     searchInput?.addEventListener('input', (e) => {

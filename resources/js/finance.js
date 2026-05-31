@@ -905,6 +905,183 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('pre-anio').addEventListener('change', loadPresupuestos);
     document.getElementById('pre-mes').addEventListener('change', loadPresupuestos);
 
+    // ──── Devoluciones ─────────────────────────────────────────
+    async function loadDevCompras() {
+        const tbody = document.getElementById('tbody-dev-compras');
+        if (!tbody) return;
+        try {
+            const { data } = await api.get('/api/finance/devoluciones-compra');
+            const rows = data.data ?? data;
+            if (!rows.length) { tbody.innerHTML = '<tr><td colspan="4" class="px-5 py-5 text-center text-slate-400">Sin devoluciones.</td></tr>'; return; }
+            tbody.innerHTML = rows.map(d => {
+                const badge = d.estado === 'aplicada' ? 'bg-emerald-100 text-emerald-700' : (d.estado === 'cancelada' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700');
+                return `<tr class="hover:bg-slate-50 dark:hover:bg-zinc-800/50">
+                    <td class="px-4 py-3 text-sm font-medium">${esc(d.proveedor?.nombre ?? '—')}</td>
+                    <td class="px-4 py-3 text-sm text-slate-500">${fmtDate(d.fecha)}</td>
+                    <td class="px-4 py-3 text-right font-mono text-sm font-semibold">${fmt(d.total)}</td>
+                    <td class="px-4 py-3"><span class="text-xs font-semibold px-2 py-0.5 rounded-full ${badge}">${d.estado}</span></td>
+                </tr>`;
+            }).join('');
+        } catch { tbody.innerHTML = '<tr><td colspan="4" class="px-5 py-5 text-center text-rose-400">Error al cargar.</td></tr>'; }
+    }
+
+    async function loadDevVentas() {
+        const tbody = document.getElementById('tbody-dev-ventas');
+        if (!tbody) return;
+        try {
+            const { data } = await api.get('/api/finance/devoluciones-venta');
+            const rows = data.data ?? data;
+            if (!rows.length) { tbody.innerHTML = '<tr><td colspan="4" class="px-5 py-5 text-center text-slate-400">Sin devoluciones.</td></tr>'; return; }
+            tbody.innerHTML = rows.map(d => {
+                const badge = d.estado === 'aplicada' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700';
+                return `<tr class="hover:bg-slate-50 dark:hover:bg-zinc-800/50">
+                    <td class="px-4 py-3 text-sm text-slate-500">#${d.venta_id}</td>
+                    <td class="px-4 py-3 text-sm text-slate-500">${fmtDate(d.fecha)}</td>
+                    <td class="px-4 py-3 text-right font-mono text-sm font-semibold">${fmt(d.total)}</td>
+                    <td class="px-4 py-3"><span class="text-xs font-semibold px-2 py-0.5 rounded-full ${badge}">${d.estado}</span></td>
+                </tr>`;
+            }).join('');
+        } catch { tbody.innerHTML = '<tr><td colspan="4" class="px-5 py-5 text-center text-rose-400">Error al cargar.</td></tr>'; }
+    }
+
+    // ──── Conciliación ─────────────────────────────────────────
+    async function loadConciliaciones() {
+        const tbody = document.getElementById('tbody-conciliaciones');
+        if (!tbody) return;
+        try {
+            const { data } = await api.get('/api/finance/conciliaciones');
+            const rows = data.data ?? data;
+            if (!rows.length) { tbody.innerHTML = '<tr><td colspan="6" class="px-5 py-5 text-center text-slate-400">Sin conciliaciones.</td></tr>'; return; }
+            tbody.innerHTML = rows.map(c => {
+                const badge = c.estado === 'cerrada' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700';
+                const difColor = Math.abs(c.diferencia) < 0.01 ? 'text-emerald-600' : 'text-rose-600';
+                return `<tr class="hover:bg-slate-50 dark:hover:bg-zinc-800/50">
+                    <td class="px-5 py-3 text-sm font-medium">${esc(c.cuenta?.nombre ?? '—')}</td>
+                    <td class="px-5 py-3 text-sm text-slate-500">${fmtDate(c.fecha_inicio)} – ${fmtDate(c.fecha_fin)}</td>
+                    <td class="px-5 py-3 text-right font-mono text-sm">${fmt(c.saldo_banco_statement)}</td>
+                    <td class="px-5 py-3 text-right font-mono text-sm">${fmt(c.saldo_sistema)}</td>
+                    <td class="px-5 py-3 text-right font-mono text-sm font-semibold ${difColor}">${fmt(c.diferencia)}</td>
+                    <td class="px-5 py-3"><span class="text-xs font-semibold px-2 py-0.5 rounded-full ${badge}">${c.estado}</span></td>
+                </tr>`;
+            }).join('');
+        } catch { tbody.innerHTML = '<tr><td colspan="6" class="px-5 py-5 text-center text-rose-400">Error al cargar.</td></tr>'; }
+    }
+
+    document.getElementById('btn-nueva-conciliacion')?.addEventListener('click', async () => {
+        const cuentaOpts = cuentas.map(c => `${c.id}: ${c.nombre}`).join('\n');
+        const cuentaId = parseInt(prompt(`Selecciona cuenta (ID):\n${cuentaOpts}`));
+        if (!cuentaId) return;
+        const desde = prompt('Fecha inicio (YYYY-MM-DD):');
+        const hasta = prompt('Fecha fin (YYYY-MM-DD):');
+        const saldo = parseFloat(prompt('Saldo del estado de cuenta bancario:'));
+        if (!desde || !hasta || isNaN(saldo)) { toast('Datos incompletos', 'warn'); return; }
+        try {
+            await api.post('/api/finance/conciliaciones', { cuenta_id: cuentaId, fecha_inicio: desde, fecha_fin: hasta, saldo_banco_statement: saldo });
+            toast('Conciliación creada');
+            loadConciliaciones();
+        } catch (err) {
+            toast(err.response?.data?.message || 'Error', 'error');
+        }
+    });
+
+    // ──── Reportes P&G ─────────────────────────────────────────
+    document.getElementById('btn-rep-pyg')?.addEventListener('click', async () => {
+        const desde = document.getElementById('rep-desde')?.value;
+        const hasta = document.getElementById('rep-hasta')?.value;
+        if (!desde || !hasta) { toast('Selecciona el período', 'warn'); return; }
+        try {
+            const { data } = await api.get(`/api/finance/reportes/pyg?desde=${desde}&hasta=${hasta}`);
+            document.getElementById('rep-pyg-ingresos').textContent = fmt(data.total_ingresos);
+            document.getElementById('rep-pyg-egresos').textContent  = fmt(data.total_egresos);
+            document.getElementById('rep-pyg-utilidad').textContent = fmt(data.utilidad_bruta);
+            document.getElementById('rep-pyg-margen').textContent   = `Margen ${data.margen_pct}%`;
+            document.getElementById('rep-pyg-container').classList.remove('hidden');
+        } catch (err) { toast('Error al cargar P&G', 'error'); }
+    });
+
+    document.getElementById('btn-rep-aging-cxc')?.addEventListener('click', async () => {
+        const al = new Date().toISOString().split('T')[0];
+        try {
+            const { data } = await api.get(`/api/finance/reportes/aging-cxc?al=${al}`);
+            const container = document.getElementById('rep-aging-cxc');
+            if (!container) return;
+            container.innerHTML = `<p class="text-xs text-slate-400 mb-3">Total: <strong class="text-slate-700 dark:text-zinc-200">${fmt(data.total_saldo)}</strong></p>` +
+                data.buckets.map(b => `
+                    <div class="flex justify-between items-center py-1.5 border-b border-slate-100 dark:border-zinc-800 last:border-0">
+                        <span class="text-sm text-slate-600 dark:text-zinc-300">${esc(b.label)}</span>
+                        <div class="text-right">
+                            <span class="font-mono text-sm font-semibold">${fmt(b.total)}</span>
+                            <span class="text-xs text-slate-400 ml-1">(${b.items?.length ?? 0})</span>
+                        </div>
+                    </div>`).join('');
+        } catch { toast('Error al cargar aging CxC', 'error'); }
+    });
+
+    document.getElementById('btn-rep-aging-cxp')?.addEventListener('click', async () => {
+        const al = new Date().toISOString().split('T')[0];
+        try {
+            const { data } = await api.get(`/api/finance/reportes/aging-cxp?al=${al}`);
+            const container = document.getElementById('rep-aging-cxp');
+            if (!container) return;
+            container.innerHTML = `<p class="text-xs text-slate-400 mb-3">Total: <strong class="text-slate-700 dark:text-zinc-200">${fmt(data.total_saldo)}</strong></p>` +
+                data.buckets.map(b => `
+                    <div class="flex justify-between items-center py-1.5 border-b border-slate-100 dark:border-zinc-800 last:border-0">
+                        <span class="text-sm text-slate-600 dark:text-zinc-300">${esc(b.label)}</span>
+                        <div class="text-right">
+                            <span class="font-mono text-sm font-semibold">${fmt(b.total)}</span>
+                            <span class="text-xs text-slate-400 ml-1">(${b.items?.length ?? 0})</span>
+                        </div>
+                    </div>`).join('');
+        } catch { toast('Error al cargar aging CxP', 'error'); }
+    });
+
+    // ──── Activos Fijos ────────────────────────────────────────
+    async function loadActivosFijos() {
+        const tbody = document.getElementById('tbody-activos');
+        if (!tbody) return;
+        try {
+            const { data } = await api.get('/api/finance/activos-fijos');
+            const rows = data.data ?? data;
+            if (!rows.length) { tbody.innerHTML = '<tr><td colspan="6" class="px-5 py-5 text-center text-slate-400">Sin activos fijos.</td></tr>'; return; }
+            tbody.innerHTML = rows.map(a => {
+                const estadoBadge = { activo: 'bg-emerald-100 text-emerald-700', vendido: 'bg-slate-100 text-slate-600', dado_de_baja: 'bg-rose-100 text-rose-700' }[a.estado] ?? '';
+                const valorLibro = a.costo_adquisicion - (a.depreciaciones?.reduce((s, d) => s + Number(d.depreciacion_mensual), 0) ?? 0);
+                return `<tr class="hover:bg-slate-50 dark:hover:bg-zinc-800/50">
+                    <td class="px-5 py-3 text-sm font-medium">${esc(a.nombre)}</td>
+                    <td class="px-5 py-3 text-sm text-slate-500">${esc(a.categoria ?? '—')}</td>
+                    <td class="px-5 py-3 text-right font-mono text-sm">${fmt(a.costo_adquisicion)}</td>
+                    <td class="px-5 py-3 text-right font-mono text-sm font-semibold">${fmt(valorLibro)}</td>
+                    <td class="px-5 py-3 text-sm text-slate-500">${a.metodo_depreciacion}</td>
+                    <td class="px-5 py-3"><span class="text-xs font-semibold px-2 py-0.5 rounded-full ${estadoBadge}">${a.estado}</span></td>
+                </tr>`;
+            }).join('');
+        } catch { tbody.innerHTML = '<tr><td colspan="6" class="px-5 py-5 text-center text-rose-400">Error al cargar.</td></tr>'; }
+    }
+
+    // ──── Tabs: registrar nuevos ───────────────────────────────
+    // Inyectar en el sistema de tabs existente
+    const extraTabHandlers = {
+        devoluciones: () => { loadDevCompras(); loadDevVentas(); },
+        conciliacion: loadConciliaciones,
+        reportes: () => {
+            const hoy = new Date().toISOString().split('T')[0];
+            const hace30 = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+            const desde = document.getElementById('rep-desde');
+            const hasta = document.getElementById('rep-hasta');
+            if (desde && !desde.value) desde.value = hace30;
+            if (hasta && !hasta.value) hasta.value = hoy;
+        },
+        activos: loadActivosFijos,
+    };
+
+    // Parchear el listener de tabs existente para los tabs nuevos
+    document.querySelectorAll('.tab-btn[data-tab="devoluciones"], .tab-btn[data-tab="conciliacion"], .tab-btn[data-tab="reportes"], .tab-btn[data-tab="activos"]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tab = btn.dataset.tab;
+            if (extraTabHandlers[tab]) extraTabHandlers[tab]();
+        });
+    });
+
     // ──── Eventos globales ─────────────────────────────────────
     document.getElementById('fin-period').addEventListener('change', loadStats);
     initPresupuestoFilters();

@@ -77,14 +77,31 @@
     </div>
 
     <!-- Tabs -->
-    <div class="flex gap-6 border-b border-slate-200 dark:border-zinc-800 mb-5">
+    <div class="flex gap-5 border-b border-slate-200 dark:border-zinc-800 mb-5 overflow-x-auto">
         <button id="tab-products"
-            class="pb-3 text-sm font-semibold border-b-2 border-emerald-500 text-emerald-600 dark:text-emerald-400 transition-colors">
+            class="pb-3 text-sm font-semibold border-b-2 border-emerald-500 text-emerald-600 dark:text-emerald-400 transition-colors whitespace-nowrap">
             Productos
         </button>
         <button id="tab-movements"
-            class="pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300 transition-colors">
-            Historial de Movimientos
+            class="pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300 transition-colors whitespace-nowrap">
+            Movimientos
+        </button>
+        <button id="tab-almacenes"
+            class="pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300 transition-colors whitespace-nowrap">
+            Almacenes
+        </button>
+        <button id="tab-transferencias"
+            class="pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300 transition-colors whitespace-nowrap">
+            Transferencias
+        </button>
+        <button id="tab-inv-fisico"
+            class="pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300 transition-colors whitespace-nowrap">
+            Inventario Físico
+        </button>
+        <button id="tab-alertas"
+            class="pb-3 text-sm font-semibold border-b-2 border-transparent text-rose-500 dark:text-rose-400 hover:text-rose-600 dark:hover:text-rose-300 transition-colors whitespace-nowrap flex items-center gap-1">
+            <span id="alertas-badge" class="hidden w-2 h-2 rounded-full bg-rose-500"></span>
+            Alertas
         </button>
     </div>
 
@@ -270,6 +287,12 @@
 
                 <form id="movement-form" class="space-y-4">
                     <div>
+                        <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Almacén <span class="text-rose-500">*</span></label>
+                        <select name="almacen_id" id="movement-almacen" required class="{{ $inp2 }}">
+                            <!-- JS injected -->
+                        </select>
+                    </div>
+                    <div>
                         <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Producto</label>
                         <select name="product_id" id="movement-product" required class="{{ $inp2 }}">
                             <!-- JS injected -->
@@ -308,6 +331,110 @@
                             class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-all">Registrar</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECTION: ALMACENES -->
+    <div id="section-almacenes" class="hidden space-y-4">
+        <div class="flex justify-between items-center">
+            <h3 class="text-sm font-semibold text-slate-700 dark:text-zinc-300">Almacenes registrados</h3>
+            <button id="btn-nuevo-almacen" class="bg-emerald-600 hover:bg-emerald-700 active:-translate-y-px text-white px-4 py-2.5 rounded-xl font-semibold text-sm transition-all flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                Nuevo almacén
+            </button>
+        </div>
+        <div id="almacenes-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <p class="text-slate-400 dark:text-zinc-500 text-sm">Cargando...</p>
+        </div>
+    </div>
+
+    <!-- SECTION: TRANSFERENCIAS -->
+    <div id="section-transferencias" class="hidden space-y-4">
+        <div class="flex justify-between items-center">
+            <h3 class="text-sm font-semibold text-slate-700 dark:text-zinc-300">Transferencias entre almacenes</h3>
+            <button id="btn-nueva-transferencia" class="bg-emerald-600 hover:bg-emerald-700 active:-translate-y-px text-white px-4 py-2.5 rounded-xl font-semibold text-sm transition-all flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                Nueva transferencia
+            </button>
+        </div>
+        <div class="bg-white dark:bg-zinc-900 border border-slate-200/70 dark:border-zinc-800 rounded-2xl overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 dark:bg-zinc-800/60 border-b border-slate-200 dark:border-zinc-700 text-[11px] font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">
+                            <th class="px-5 py-3.5">Fecha</th>
+                            <th class="px-5 py-3.5">Origen</th>
+                            <th class="px-5 py-3.5">Destino</th>
+                            <th class="px-5 py-3.5 text-center">Ítems</th>
+                            <th class="px-5 py-3.5">Estado</th>
+                            <th class="px-5 py-3.5">Usuario</th>
+                            <th class="px-5 py-3.5 text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-transferencias" class="divide-y divide-slate-100 dark:divide-zinc-800">
+                        <tr><td colspan="7" class="px-5 py-6 text-center text-slate-400 dark:text-zinc-500">Cargando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECTION: INVENTARIO FÍSICO -->
+    <div id="section-inv-fisico" class="hidden space-y-4">
+        <div class="flex justify-between items-center">
+            <h3 class="text-sm font-semibold text-slate-700 dark:text-zinc-300">Sesiones de inventario físico</h3>
+            <button id="btn-nueva-sesion-inv" class="bg-emerald-600 hover:bg-emerald-700 active:-translate-y-px text-white px-4 py-2.5 rounded-xl font-semibold text-sm transition-all flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                Nueva sesión
+            </button>
+        </div>
+        <div class="bg-white dark:bg-zinc-900 border border-slate-200/70 dark:border-zinc-800 rounded-2xl overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 dark:bg-zinc-800/60 border-b border-slate-200 dark:border-zinc-700 text-[11px] font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">
+                            <th class="px-5 py-3.5">Almacén</th>
+                            <th class="px-5 py-3.5">Apertura</th>
+                            <th class="px-5 py-3.5">Cierre</th>
+                            <th class="px-5 py-3.5 text-right">Diferencia $</th>
+                            <th class="px-5 py-3.5">Estado</th>
+                            <th class="px-5 py-3.5">Usuario</th>
+                            <th class="px-5 py-3.5 text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-inv-fisico" class="divide-y divide-slate-100 dark:divide-zinc-800">
+                        <tr><td colspan="7" class="px-5 py-6 text-center text-slate-400 dark:text-zinc-500">Cargando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECTION: ALERTAS DE STOCK -->
+    <div id="section-alertas" class="hidden space-y-4">
+        <div class="flex justify-between items-center">
+            <h3 class="text-sm font-semibold text-slate-700 dark:text-zinc-300">Alertas de stock activas</h3>
+            <span id="alertas-count" class="bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 text-xs font-bold px-3 py-1 rounded-full">0 alertas</span>
+        </div>
+        <div class="bg-white dark:bg-zinc-900 border border-slate-200/70 dark:border-zinc-800 rounded-2xl overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 dark:bg-zinc-800/60 border-b border-slate-200 dark:border-zinc-700 text-[11px] font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">
+                            <th class="px-5 py-3.5">SKU</th>
+                            <th class="px-5 py-3.5">Producto</th>
+                            <th class="px-5 py-3.5">Almacén</th>
+                            <th class="px-5 py-3.5">Tipo alerta</th>
+                            <th class="px-5 py-3.5 text-center">Stock actual</th>
+                            <th class="px-5 py-3.5 text-center">Stock mínimo</th>
+                            <th class="px-5 py-3.5 text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-alertas" class="divide-y divide-slate-100 dark:divide-zinc-800">
+                        <tr><td colspan="7" class="px-5 py-6 text-center text-slate-400 dark:text-zinc-500">Cargando...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>

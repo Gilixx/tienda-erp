@@ -4,51 +4,72 @@ namespace App\Http\Controllers\Api\Inventory;
 
 use App\Http\Controllers\Controller;
 use App\Models\InventoryMovement;
+use App\Models\Inventory\ProductStock;
 use App\Models\Product;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class MovementController extends Controller
 {
-    public function index()
+    /** GET /api/inventory/movements */
+    public function index(Request $request): JsonResponse
     {
-        $movements = InventoryMovement::with(['product', 'user'])
+        $query = InventoryMovement::with(['product:id,name,sku', 'user:id,name', 'almacen:id,nombre,codigo'])
             ->latest()
-            ->limit(200)
-            ->get();
+            ->limit(200);
 
-        return response()->json($movements);
+        if ($request->filled('almacen_id')) {
+            $query->where('almacen_id', $request->integer('almacen_id'));
+        }
+        if ($request->filled('product_id')) {
+            $query->where('product_id', $request->integer('product_id'));
+        }
+
+        return response()->json($query->get());
     }
 
-    public function store(Request $request)
+    /** POST /api/inventory/movements */
+    public function store(Request $request): JsonResponse
     {
         $isAdjustment = $request->input('type') === 'adjustment';
 
         $validated = $request->validate([
-            'product_id' => 'required|exists:products,id',
-            'type'       => 'required|in:in,out,adjustment',
-            'quantity'   => ['required', 'integer', $isAdjustment ? 'min:-999999' : 'min:1'],
-            'reference'  => 'nullable|string|max:255',
-            'notes'      => 'nullable|string|max:1000',
+            'product_id'  => 'required|exists:products,id',
+            'almacen_id'  => 'required|exists:almacenes,id',
+            'type'        => 'required|in:in,out,adjustment',
+            'quantity'    => ['required', 'integer', $isAdjustment ? 'min:-999999' : 'min:1'],
+            'reference'   => 'nullable|string|max:255',
+            'notes'       => 'nullable|string|max:1000',
         ]);
 
         try {
             DB::beginTransaction();
 
+            // Lock para evitar race conditions
             $product = Product::lockForUpdate()->findOrFail($validated['product_id']);
 
+            $stockRow = ProductStock::lockForUpdate()
+                ->where('product_id', $validated['product_id'])
+                ->where('almacen_id', $validated['almacen_id'])
+                ->first();
+
+            $stockEnAlmacen = $stockRow?->cantidad ?? 0;
+
             if ($validated['type'] === 'out') {
-                if ($product->stock < $validated['quantity']) {
+                if ($stockEnAlmacen < $validated['quantity']) {
                     DB::rollBack();
-                    return response()->json(['error' => 'No hay suficiente stock disponible.'], 422);
+                    return response()->json([
+                        'error' => "No hay suficiente stock en este almacén. Disponible: {$stockEnAlmacen}.",
+                    ], 422);
                 }
                 $quantityChange = -$validated['quantity'];
 
             } elseif ($validated['type'] === 'adjustment') {
-                $newStock = $product->stock + $validated['quantity'];
-                if ($newStock < 0) {
+                $nuevoStock = $stockEnAlmacen + $validated['quantity'];
+                if ($nuevoStock < 0) {
                     DB::rollBack();
-                    return response()->json(['error' => 'El ajuste resultaría en stock negativo.'], 422);
+                    return response()->json(['error' => 'El ajuste resultaría en stock negativo en este almacén.'], 422);
                 }
                 $quantityChange = $validated['quantity'];
 
@@ -56,20 +77,37 @@ class MovementController extends Controller
                 $quantityChange = $validated['quantity'];
             }
 
-            $movement = InventoryMovement::create([
-                'product_id' => $product->id,
-                'user_id'    => auth()->id(),
-                'type'       => $validated['type'],
-                'quantity'   => $quantityChange,
-                'reference'  => $validated['reference'] ?? null,
-                'notes'      => $validated['notes'] ?? null,
-            ]);
+            // Actualizar o crear registro de stock por almacén
+            if ($stockRow) {
+                $stockRow->increment('cantidad', $quantityChange);
+                $stockRow->touch();
+            } else {
+                ProductStock::create([
+                    'product_id' => $validated['product_id'],
+                    'almacen_id' => $validated['almacen_id'],
+                    'cantidad'   => $quantityChange,
+                ]);
+            }
 
+            // Mantener products.stock (total global) en sincronía
             $product->increment('stock', $quantityChange);
+
+            $movement = InventoryMovement::create([
+                'product_id'  => $product->id,
+                'almacen_id'  => $validated['almacen_id'],
+                'user_id'     => auth()->id(),
+                'type'        => $validated['type'],
+                'quantity'    => $quantityChange,
+                'reference'   => $validated['reference'] ?? null,
+                'notes'       => $validated['notes'] ?? null,
+            ]);
 
             DB::commit();
 
-            return response()->json($movement->load(['product', 'user']), 201);
+            return response()->json(
+                $movement->load(['product:id,name,sku', 'user:id,name', 'almacen:id,nombre,codigo']),
+                201
+            );
 
         } catch (\Exception $e) {
             DB::rollBack();
