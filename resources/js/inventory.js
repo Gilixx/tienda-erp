@@ -322,33 +322,33 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!movementsTbody) return;
 
         if (state.movements.length === 0) {
-            movementsTbody.innerHTML = `<tr><td colspan="7" class="px-6 py-10 text-center text-slate-400 text-sm">No hay movimientos registrados.</td></tr>`;
+            movementsTbody.innerHTML = `<tr><td colspan="7" class="px-6 py-10 text-center text-slate-400 dark:text-zinc-500 text-sm">No hay movimientos registrados.</td></tr>`;
             return;
         }
 
         const typeMap = {
-            in:         { label: 'Entrada',  cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-            out:        { label: 'Salida',   cls: 'bg-rose-100 text-rose-700 border-rose-200' },
-            adjustment: { label: 'Ajuste',   cls: 'bg-amber-100 text-amber-700 border-amber-200' },
+            in:         { label: 'Entrada',  cls: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50' },
+            out:        { label: 'Salida',   cls: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 border-rose-200 dark:border-rose-800/50' },
+            adjustment: { label: 'Ajuste',   cls: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/50' },
         };
 
         movementsTbody.innerHTML = state.movements.map(m => {
             const t       = typeMap[m.type] || { label: m.type, cls: '' };
             const qty     = m.quantity > 0 ? `+${m.quantity}` : m.quantity;
-            const qtyCls  = m.quantity >= 0 ? 'text-emerald-600 font-bold' : 'text-rose-600 font-bold';
+            const qtyCls  = m.quantity >= 0 ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-rose-600 dark:text-rose-400 font-bold';
             const nota    = m.notes || m.reference || '—';
 
             return `
-            <tr class="border-b border-slate-100 hover:bg-slate-50/60 transition-colors">
-                <td class="px-5 py-3 whitespace-nowrap text-xs text-slate-400">${formatDate(m.created_at)}</td>
-                <td class="px-5 py-3 whitespace-nowrap text-sm font-medium text-slate-800">${esc(m.product?.name || '—')}</td>
-                <td class="px-5 py-3 whitespace-nowrap text-xs font-mono text-slate-500">${esc(m.product?.sku || '—')}</td>
+            <tr class="border-b border-slate-100 dark:border-zinc-800 hover:bg-slate-50/60 dark:hover:bg-zinc-800/40 transition-colors">
+                <td class="px-5 py-3 whitespace-nowrap text-xs text-slate-400 dark:text-zinc-500">${formatDate(m.created_at)}</td>
+                <td class="px-5 py-3 whitespace-nowrap text-sm font-medium text-slate-800 dark:text-zinc-100">${esc(m.product?.name || '—')}</td>
+                <td class="px-5 py-3 whitespace-nowrap text-xs font-mono text-slate-500 dark:text-zinc-400">${esc(m.product?.sku || '—')}</td>
                 <td class="px-5 py-3 whitespace-nowrap">
                     <span class="px-2.5 py-1 inline-flex text-xs font-semibold rounded-full border ${t.cls}">${t.label}</span>
                 </td>
                 <td class="px-5 py-3 whitespace-nowrap text-sm ${qtyCls}">${qty}</td>
-                <td class="px-5 py-3 text-sm text-slate-500 max-w-[200px] truncate">${esc(nota)}</td>
-                <td class="px-5 py-3 whitespace-nowrap text-sm text-slate-500">${esc(m.user?.name || '—')}</td>
+                <td class="px-5 py-3 text-sm text-slate-500 dark:text-zinc-400 max-w-[200px] truncate">${esc(nota)}</td>
+                <td class="px-5 py-3 whitespace-nowrap text-sm text-slate-500 dark:text-zinc-400">${esc(m.user?.name || '—')}</td>
             </tr>`;
         }).join('');
     }
