@@ -570,6 +570,79 @@
         </div>
     </div>
 
+    <!-- MODAL: NUEVA SESIÓN INVENTARIO FÍSICO -->
+    <div id="invfisico-modal" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 flex">
+        <div class="absolute inset-0 bg-slate-900/50 dark:bg-black/60 backdrop-blur-sm"></div>
+        <div class="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 dark:border-zinc-800">
+            <div class="p-6 sm:p-8">
+                <div class="flex justify-between items-center mb-5">
+                    <h3 class="text-xl font-bold text-slate-800 dark:text-zinc-50">Nueva Sesión de Inventario</h3>
+                    <button type="button" id="close-invfisico-modal" class="text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300 transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                @php $inpI = 'w-full rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 focus:bg-white dark:focus:bg-zinc-700 focus:border-emerald-500 focus:ring-emerald-500 transition-colors text-sm'; @endphp
+                <form id="invfisico-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Almacén <span class="text-rose-500">*</span></label>
+                        <select name="almacen_id" id="invfisico-almacen" required class="{{ $inpI }}"></select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Notas</label>
+                        <textarea name="notas" rows="2" maxlength="1000" class="{{ $inpI }}"></textarea>
+                    </div>
+                    <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/40 rounded-xl p-3 text-xs text-amber-800 dark:text-amber-300">
+                        Al abrir la sesión se tomará un snapshot del stock actual. Luego registrarás el conteo físico de cada producto.
+                    </div>
+                    <div class="pt-2 flex justify-end gap-3">
+                        <button type="button" id="cancel-invfisico-modal"
+                            class="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800 font-medium text-sm transition-colors">Cancelar</button>
+                        <button type="submit"
+                            class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-all">Abrir sesión</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: DETALLE INVENTARIO FÍSICO (conteo) -->
+    <div id="invfisico-detalle-modal" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 flex">
+        <div class="absolute inset-0 bg-slate-900/50 dark:bg-black/60 backdrop-blur-sm"></div>
+        <div class="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden border border-slate-100 dark:border-zinc-800 flex flex-col">
+            <div class="p-6 sm:p-8 overflow-y-auto">
+                <div class="flex justify-between items-center mb-5">
+                    <div>
+                        <h3 class="text-xl font-bold text-slate-800 dark:text-zinc-50">Conteo Físico</h3>
+                        <p id="invfisico-detalle-info" class="text-xs text-slate-500 dark:text-zinc-400 mt-1"></p>
+                    </div>
+                    <button type="button" id="close-invfisico-detalle" class="text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300 transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <div class="overflow-x-auto border border-slate-200 dark:border-zinc-800 rounded-xl">
+                    <table class="w-full text-sm">
+                        <thead class="bg-slate-50 dark:bg-zinc-800/60">
+                            <tr class="text-[11px] font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">
+                                <th class="px-4 py-2 text-left">SKU</th>
+                                <th class="px-4 py-2 text-left">Producto</th>
+                                <th class="px-4 py-2 text-center">Teórico</th>
+                                <th class="px-4 py-2 text-center">Contado</th>
+                                <th class="px-4 py-2 text-center">Diferencia</th>
+                            </tr>
+                        </thead>
+                        <tbody id="invfisico-detalle-tbody" class="divide-y divide-slate-100 dark:divide-zinc-800"></tbody>
+                    </table>
+                </div>
+                <div class="pt-4 flex justify-end gap-3">
+                    <button type="button" id="cancel-invfisico-detalle"
+                        class="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800 font-medium text-sm transition-colors">Cerrar</button>
+                    <button type="button" id="btn-aplicar-invfisico"
+                        class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-all">Aplicar ajustes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 @endsection
 

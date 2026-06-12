@@ -859,51 +859,174 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!tbody) return;
             const items = data.data ?? data;
             if (!items.length) {
-                tbody.innerHTML = '<tr><td colspan="7" class="px-5 py-6 text-center text-slate-400">No hay sesiones de inventario.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" class="px-5 py-6 text-center text-slate-400 dark:text-zinc-500">No hay sesiones de inventario.</td></tr>';
                 return;
             }
+            const estadoMap = {
+                abierto:  { label: 'Abierto',  cls: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400' },
+                cerrado:  { label: 'Cerrado',  cls: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400' },
+                aplicado: { label: 'Aplicado', cls: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' },
+            };
             tbody.innerHTML = items.map(s => {
-                const estadoBadge = { abierto: 'bg-amber-100 text-amber-700', cerrado: 'bg-indigo-100 text-indigo-700', aplicado: 'bg-emerald-100 text-emerald-700' }[s.estado] ?? '';
-                return `<tr class="hover:bg-slate-50 dark:hover:bg-zinc-800/50 transition-colors">
-                    <td class="px-5 py-3.5 text-sm font-medium">${esc(s.almacen?.nombre ?? '—')}</td>
-                    <td class="px-5 py-3.5 text-sm text-slate-500">${new Date(s.fecha_apertura).toLocaleString('es-MX')}</td>
-                    <td class="px-5 py-3.5 text-sm text-slate-500">${s.fecha_cierre ? new Date(s.fecha_cierre).toLocaleString('es-MX') : '—'}</td>
-                    <td class="px-5 py-3.5 text-right font-mono text-sm">${s.diferencia_total_valor != null ? '$' + fmt(s.diferencia_total_valor) : '—'}</td>
-                    <td class="px-5 py-3.5"><span class="text-xs font-semibold px-2 py-0.5 rounded-full ${estadoBadge}">${s.estado}</span></td>
-                    <td class="px-5 py-3.5 text-sm text-slate-500">${esc(s.user?.name ?? '—')}</td>
-                    <td class="px-5 py-3.5 text-right">
-                        ${s.estado === 'abierto' ? `<button onclick="window._aplicarInvFisico(${s.id})" class="text-xs bg-emerald-600 text-white px-3 py-1 rounded-lg hover:bg-emerald-700 transition-colors">Aplicar</button>` : ''}
+                const est = estadoMap[s.estado] ?? { label: s.estado, cls: 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300' };
+                return `<tr class="border-b border-slate-100 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition-colors">
+                    <td class="px-5 py-3.5 text-sm font-medium text-slate-800 dark:text-zinc-100">${esc(s.almacen?.nombre ?? '—')}</td>
+                    <td class="px-5 py-3.5 text-sm text-slate-500 dark:text-zinc-400">${formatDate(s.fecha_apertura)}</td>
+                    <td class="px-5 py-3.5 text-sm text-slate-500 dark:text-zinc-400">${s.fecha_cierre ? formatDate(s.fecha_cierre) : '—'}</td>
+                    <td class="px-5 py-3.5 text-right font-mono text-sm text-slate-700 dark:text-zinc-200">${s.diferencia_total_valor != null ? '$' + fmt(s.diferencia_total_valor) : '—'}</td>
+                    <td class="px-5 py-3.5"><span class="text-xs font-semibold px-2 py-0.5 rounded-full ${est.cls}">${est.label}</span></td>
+                    <td class="px-5 py-3.5 text-sm text-slate-500 dark:text-zinc-400">${esc(s.user?.name ?? '—')}</td>
+                    <td class="px-5 py-3.5 text-right whitespace-nowrap">
+                        ${s.estado === 'abierto' ? `<button data-action="contar" data-id="${s.id}" class="btn-invfisico-action text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded-lg transition-colors">Contar</button>` : ''}
+                        ${s.estado !== 'aplicado' ? `<button data-action="eliminar" data-id="${s.id}" class="btn-invfisico-action ml-1 text-xs bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40 px-3 py-1 rounded-lg transition-colors">Eliminar</button>` : ''}
                     </td>
                 </tr>`;
             }).join('');
+            tbody.querySelectorAll('.btn-invfisico-action').forEach(btn => {
+                btn.addEventListener('click', () => handleInvFisicoAction(btn.dataset.action, parseInt(btn.dataset.id)));
+            });
         } catch (err) { console.error(err); }
     }
 
-    window._aplicarInvFisico = async (id) => {
-        if (!confirm('¿Aplicar inventario físico? Se generarán ajustes de stock automáticos.')) return;
-        try {
-            await api.post(`/api/inventory/inventario-fisico/${id}/aplicar`);
-            showToast('Inventario físico aplicado. Stock ajustado.');
-            await fetchAndRenderInvFisico();
-            await fetchProducts();
-            renderProducts();
-        } catch (err) {
-            showToast(err.response?.data?.error ?? 'Error al aplicar', 'error');
+    async function handleInvFisicoAction(action, id) {
+        if (action === 'contar') {
+            openInvFisicoDetalle(id);
+        } else if (action === 'eliminar') {
+            const ok = await showConfirm('¿Eliminar esta sesión de inventario?');
+            if (!ok) return;
+            try {
+                await api.delete(`/api/inventory/inventario-fisico/${id}`);
+                showToast('Sesión eliminada.');
+                await fetchAndRenderInvFisico();
+            } catch (err) {
+                showToast(err.response?.data?.error ?? 'Error al eliminar', 'error');
+            }
         }
-    };
+    }
 
-    document.getElementById('btn-nueva-sesion-inv')?.addEventListener('click', async () => {
+    // ── Modal de nueva sesión inv físico ──
+    const invFisicoModal       = document.getElementById('invfisico-modal');
+    const invFisicoForm        = document.getElementById('invfisico-form');
+    const invFisicoAlmacen     = document.getElementById('invfisico-almacen');
+    const closeInvFisicoBtn    = document.getElementById('close-invfisico-modal');
+    const cancelInvFisicoBtn   = document.getElementById('cancel-invfisico-modal');
+
+    document.getElementById('btn-nueva-sesion-inv')?.addEventListener('click', () => {
         if (!almacenes.length) { showToast('No hay almacenes disponibles', 'warning'); return; }
-        const options = almacenes.map(a => `${a.id}: ${a.nombre}`).join('\n');
-        const input = prompt(`Selecciona almacén por ID:\n${options}`);
-        const almacenId = parseInt(input);
-        if (!almacenId) return;
+        invFisicoForm.reset();
+        invFisicoAlmacen.innerHTML = almacenes.filter(a => a.activo)
+            .map(a => `<option value="${a.id}">${esc(a.nombre)} (${esc(a.codigo)})</option>`).join('');
+        showModal(invFisicoModal);
+    });
+
+    [closeInvFisicoBtn, cancelInvFisicoBtn].forEach(el => el?.addEventListener('click', () => hideModal(invFisicoModal)));
+    invFisicoModal?.addEventListener('click', (e) => {
+        if (e.target === invFisicoModal || e.target.classList.contains('absolute')) hideModal(invFisicoModal);
+    });
+
+    invFisicoForm?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const data = Object.fromEntries(new FormData(invFisicoForm));
+        const submitBtn = invFisicoForm.querySelector('[type="submit"]');
+        submitBtn.disabled = true;
         try {
-            await api.post('/api/inventory/inventario-fisico', { almacen_id: almacenId });
-            showToast('Sesión de inventario abierta. Se tomó snapshot del stock actual.');
+            await api.post('/api/inventory/inventario-fisico', data);
+            showToast('Sesión abierta. Snapshot tomado.');
+            hideModal(invFisicoModal);
             await fetchAndRenderInvFisico();
         } catch (err) {
             showToast(err.response?.data?.error ?? 'Error al abrir sesión', 'error');
+        } finally {
+            submitBtn.disabled = false;
+        }
+    });
+
+    // ── Modal de detalle / conteo ──
+    const invFisicoDetalleModal  = document.getElementById('invfisico-detalle-modal');
+    const invFisicoDetalleTbody  = document.getElementById('invfisico-detalle-tbody');
+    const invFisicoDetalleInfo   = document.getElementById('invfisico-detalle-info');
+    const closeInvFisicoDetalleBtn  = document.getElementById('close-invfisico-detalle');
+    const cancelInvFisicoDetalleBtn = document.getElementById('cancel-invfisico-detalle');
+    const btnAplicarInvFisico       = document.getElementById('btn-aplicar-invfisico');
+    let invFisicoDetalleId = null;
+
+    async function openInvFisicoDetalle(id) {
+        invFisicoDetalleId = id;
+        invFisicoDetalleTbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400 dark:text-zinc-500">Cargando…</td></tr>';
+        showModal(invFisicoDetalleModal);
+        try {
+            const { data } = await api.get(`/api/inventory/inventario-fisico/${id}`);
+            invFisicoDetalleInfo.textContent = `${data.almacen?.nombre ?? ''} · Apertura: ${formatDate(data.fecha_apertura)} · ${data.items?.length ?? 0} productos`;
+            if (!data.items?.length) {
+                invFisicoDetalleTbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400 dark:text-zinc-500">Sin items.</td></tr>';
+                return;
+            }
+            invFisicoDetalleTbody.innerHTML = data.items.map(it => {
+                const contado = it.cantidad_contada;
+                const dif = contado != null ? (contado - it.cantidad_teorica) : null;
+                const difCls = dif == null ? 'text-slate-400 dark:text-zinc-500' :
+                                (dif === 0 ? 'text-slate-600 dark:text-zinc-300' :
+                                (dif > 0 ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-rose-600 dark:text-rose-400 font-semibold'));
+                const difTxt = dif == null ? '—' : (dif > 0 ? `+${dif}` : dif);
+                return `<tr>
+                    <td class="px-4 py-2 text-xs font-mono text-slate-500 dark:text-zinc-400">${esc(it.product?.sku ?? '—')}</td>
+                    <td class="px-4 py-2 text-sm text-slate-800 dark:text-zinc-100">${esc(it.product?.name ?? '—')}</td>
+                    <td class="px-4 py-2 text-center text-sm text-slate-600 dark:text-zinc-300 font-mono">${it.cantidad_teorica}</td>
+                    <td class="px-4 py-2 text-center">
+                        <input type="number" min="0" value="${contado ?? ''}" data-item-id="${it.id}" class="invfisico-conteo w-20 text-center rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 text-sm focus:border-emerald-500 focus:ring-emerald-500 py-1 px-2">
+                    </td>
+                    <td class="px-4 py-2 text-center text-sm ${difCls}">${difTxt}</td>
+                </tr>`;
+            }).join('');
+
+            // Auto-save on blur
+            invFisicoDetalleTbody.querySelectorAll('.invfisico-conteo').forEach(input => {
+                input.addEventListener('blur', async () => {
+                    const val = input.value === '' ? null : parseInt(input.value);
+                    if (val === null) return;
+                    if (val < 0 || isNaN(val)) { input.value = ''; return; }
+                    try {
+                        await api.patch(`/api/inventory/inventario-fisico/${invFisicoDetalleId}/items/${input.dataset.itemId}`, {
+                            cantidad_contada: val,
+                        });
+                        // Refrescar fila para mostrar diferencia
+                        const tr = input.closest('tr');
+                        const teorico = parseInt(tr.children[2].textContent.trim());
+                        const dif = val - teorico;
+                        const cell = tr.children[4];
+                        cell.className = 'px-4 py-2 text-center text-sm ' +
+                            (dif === 0 ? 'text-slate-600 dark:text-zinc-300' :
+                            (dif > 0 ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-rose-600 dark:text-rose-400 font-semibold'));
+                        cell.textContent = dif > 0 ? `+${dif}` : dif;
+                    } catch (err) {
+                        showToast('Error al guardar conteo', 'error');
+                    }
+                });
+            });
+        } catch (err) {
+            invFisicoDetalleTbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-rose-500">Error al cargar.</td></tr>';
+        }
+    }
+
+    [closeInvFisicoDetalleBtn, cancelInvFisicoDetalleBtn].forEach(el =>
+        el?.addEventListener('click', () => hideModal(invFisicoDetalleModal))
+    );
+    invFisicoDetalleModal?.addEventListener('click', (e) => {
+        if (e.target === invFisicoDetalleModal || e.target.classList.contains('absolute')) hideModal(invFisicoDetalleModal);
+    });
+
+    btnAplicarInvFisico?.addEventListener('click', async () => {
+        if (!invFisicoDetalleId) return;
+        const ok = await showConfirm('¿Aplicar ajustes de inventario?\nEsta acción generará movimientos automáticos y no se puede revertir.');
+        if (!ok) return;
+        try {
+            await api.post(`/api/inventory/inventario-fisico/${invFisicoDetalleId}/aplicar`);
+            showToast('Inventario aplicado. Stock ajustado.');
+            hideModal(invFisicoDetalleModal);
+            await Promise.all([fetchAndRenderInvFisico(), fetchProducts()]);
+            renderProducts();
+        } catch (err) {
+            showToast(err.response?.data?.error ?? 'Error al aplicar', 'error');
         }
     });
 
