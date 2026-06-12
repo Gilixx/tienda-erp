@@ -117,12 +117,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const overlay = document.createElement('div');
             overlay.className = 'fixed inset-0 z-[200] flex items-center justify-center p-4';
             overlay.innerHTML = `
-                <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"></div>
-                <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 border border-slate-100">
-                    <p class="text-slate-700 font-medium mb-6 text-center text-sm leading-relaxed">${esc(message)}</p>
+                <div class="absolute inset-0 bg-slate-900/50 dark:bg-black/60 backdrop-blur-sm"></div>
+                <div class="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-sm p-6 border border-slate-100 dark:border-zinc-800">
+                    <p class="text-slate-700 dark:text-zinc-200 font-medium mb-6 text-center text-sm leading-relaxed whitespace-pre-line">${esc(message)}</p>
                     <div class="flex gap-3 justify-center">
-                        <button id="confirm-cancel" class="px-5 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-medium text-sm transition-colors">Cancelar</button>
-                        <button id="confirm-ok" class="px-5 py-2 rounded-xl bg-rose-600 text-white hover:bg-rose-700 font-medium text-sm transition-colors">Eliminar</button>
+                        <button id="confirm-cancel" class="px-5 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800 font-medium text-sm transition-colors">Cancelar</button>
+                        <button id="confirm-ok" class="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-medium text-sm transition-colors">Confirmar</button>
                     </div>
                 </div>`;
             document.body.appendChild(overlay);
