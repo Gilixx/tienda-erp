@@ -517,6 +517,59 @@
         </div>
     </div>
 
+    <!-- MODAL: TRANSFERENCIA (crear) -->
+    <div id="transferencia-modal" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 flex">
+        <div class="absolute inset-0 bg-slate-900/50 dark:bg-black/60 backdrop-blur-sm"></div>
+        <div class="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden border border-slate-100 dark:border-zinc-800 flex flex-col">
+            <div class="p-6 sm:p-8 overflow-y-auto">
+                <div class="flex justify-between items-center mb-5">
+                    <h3 class="text-xl font-bold text-slate-800 dark:text-zinc-50">Nueva Transferencia</h3>
+                    <button type="button" id="close-transferencia-modal" class="text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300 transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                @php $inpT = 'w-full rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 focus:bg-white dark:focus:bg-zinc-700 focus:border-emerald-500 focus:ring-emerald-500 transition-colors text-sm'; @endphp
+                <form id="transferencia-form" class="space-y-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Almacén origen <span class="text-rose-500">*</span></label>
+                            <select name="almacen_origen_id" id="transf-origen" required class="{{ $inpT }}"></select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Almacén destino <span class="text-rose-500">*</span></label>
+                            <select name="almacen_destino_id" id="transf-destino" required class="{{ $inpT }}"></select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Fecha <span class="text-rose-500">*</span></label>
+                            <input type="date" name="fecha" id="transf-fecha" required class="{{ $inpT }}">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Referencia</label>
+                            <input type="text" name="referencia" maxlength="100" placeholder="Opcional" class="{{ $inpT }}">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-2">Productos a transferir</label>
+                        <div id="transf-items" class="space-y-2 border border-slate-200 dark:border-zinc-700 rounded-xl p-3 max-h-60 overflow-y-auto bg-slate-50/50 dark:bg-zinc-800/50">
+                            <!-- JS rendered -->
+                        </div>
+                        <button type="button" id="transf-add-item" class="mt-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300">+ Agregar producto</button>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Notas</label>
+                        <textarea name="notas" rows="2" maxlength="1000" class="{{ $inpT }}"></textarea>
+                    </div>
+                    <div class="pt-2 flex justify-end gap-3">
+                        <button type="button" id="cancel-transferencia-modal"
+                            class="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800 font-medium text-sm transition-colors">Cancelar</button>
+                        <button type="submit"
+                            class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-all">Crear transferencia</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
 </div>
 @endsection
 

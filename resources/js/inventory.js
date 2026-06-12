@@ -753,6 +753,104 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // ── Modal de crear transferencia ──
+    const transferenciaModal     = document.getElementById('transferencia-modal');
+    const transferenciaForm      = document.getElementById('transferencia-form');
+    const transfOrigen           = document.getElementById('transf-origen');
+    const transfDestino          = document.getElementById('transf-destino');
+    const transfFecha            = document.getElementById('transf-fecha');
+    const transfItemsContainer   = document.getElementById('transf-items');
+    const closeTransferenciaBtn  = document.getElementById('close-transferencia-modal');
+    const cancelTransferenciaBtn = document.getElementById('cancel-transferencia-modal');
+    const addTransfItemBtn       = document.getElementById('transf-add-item');
+
+    function renderTransfItemRow() {
+        const row = document.createElement('div');
+        row.className = 'flex gap-2 items-center transf-item-row';
+        row.innerHTML = `
+            <select class="transf-item-product flex-1 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 text-sm focus:border-emerald-500 focus:ring-emerald-500 py-2 px-2">
+                ${state.products.map(p => `<option value="${p.id}">${esc(p.name)} (${esc(p.sku)}) — stock ${p.stock}</option>`).join('')}
+            </select>
+            <input type="number" min="1" class="transf-item-qty w-24 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 text-sm focus:border-emerald-500 focus:ring-emerald-500 py-2 px-2" placeholder="Cant." required value="1">
+            <button type="button" class="transf-item-remove text-rose-500 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300 p-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>`;
+        row.querySelector('.transf-item-remove').addEventListener('click', () => row.remove());
+        transfItemsContainer.appendChild(row);
+    }
+
+    function openTransferenciaModal() {
+        transferenciaForm.reset();
+        // Llenar selects de almacenes (filtra solo activos)
+        const opts = almacenes.filter(a => a.activo).map(a => `<option value="${a.id}">${esc(a.nombre)} (${esc(a.codigo)})</option>`).join('');
+        transfOrigen.innerHTML  = opts;
+        transfDestino.innerHTML = opts;
+        if (almacenes.length >= 2) transfDestino.value = almacenes[1].id;
+        transfFecha.value = new Date().toISOString().slice(0, 10);
+        transfItemsContainer.innerHTML = '';
+        renderTransfItemRow();
+        showModal(transferenciaModal);
+    }
+
+    document.getElementById('btn-nueva-transferencia')?.addEventListener('click', () => {
+        if (almacenes.length < 2) {
+            showToast('Necesitas al menos 2 almacenes para crear una transferencia.', 'warning');
+            return;
+        }
+        if (!state.products.length) {
+            showToast('No hay productos registrados.', 'warning');
+            return;
+        }
+        openTransferenciaModal();
+    });
+
+    addTransfItemBtn?.addEventListener('click', renderTransfItemRow);
+    [closeTransferenciaBtn, cancelTransferenciaBtn].forEach(el => el?.addEventListener('click', () => hideModal(transferenciaModal)));
+    transferenciaModal?.addEventListener('click', (e) => {
+        if (e.target === transferenciaModal || e.target.classList.contains('absolute')) hideModal(transferenciaModal);
+    });
+
+    transferenciaForm?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (transfOrigen.value === transfDestino.value) {
+            showToast('El origen y destino deben ser diferentes.', 'error');
+            return;
+        }
+        const items = Array.from(transfItemsContainer.querySelectorAll('.transf-item-row')).map(row => ({
+            product_id: parseInt(row.querySelector('.transf-item-product').value),
+            cantidad:   parseInt(row.querySelector('.transf-item-qty').value),
+        })).filter(i => i.product_id && i.cantidad > 0);
+
+        if (!items.length) {
+            showToast('Agrega al menos un producto.', 'error');
+            return;
+        }
+
+        const payload = {
+            almacen_origen_id:  parseInt(transfOrigen.value),
+            almacen_destino_id: parseInt(transfDestino.value),
+            fecha:              transfFecha.value,
+            referencia:         transferenciaForm.querySelector('[name="referencia"]').value || null,
+            notas:              transferenciaForm.querySelector('[name="notas"]').value || null,
+            items,
+        };
+
+        const submitBtn = transferenciaForm.querySelector('[type="submit"]');
+        submitBtn.disabled = true;
+        try {
+            await api.post('/api/inventory/transferencias', payload);
+            showToast('Transferencia creada en borrador.');
+            hideModal(transferenciaModal);
+            await fetchAndRenderTransferencias();
+        } catch (err) {
+            const errors = err.response?.data?.errors;
+            const msg = errors ? Object.values(errors).flat().join(' ') : (err.response?.data?.error || err.response?.data?.message || 'Error al crear');
+            showToast(msg, 'error');
+        } finally {
+            submitBtn.disabled = false;
+        }
+    });
+
     // ─── Inventario Físico ─────────────────────────────────────
     async function fetchAndRenderInvFisico() {
         try {
