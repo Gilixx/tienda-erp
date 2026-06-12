@@ -682,60 +682,76 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!tbody) return;
             const items = data.data ?? data;
             if (!items.length) {
-                tbody.innerHTML = '<tr><td colspan="7" class="px-5 py-6 text-center text-slate-400">No hay transferencias registradas.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" class="px-5 py-6 text-center text-slate-400 dark:text-zinc-500">No hay transferencias registradas.</td></tr>';
                 return;
             }
+            const estadoMap = {
+                borrador:    { label: 'Borrador',    cls: 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300' },
+                en_transito: { label: 'En tránsito', cls: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400' },
+                recibida:    { label: 'Recibida',    cls: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' },
+                cancelada:   { label: 'Cancelada',   cls: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400' },
+            };
             tbody.innerHTML = items.map(t => {
-                const estadoBadge = {
-                    borrador: 'bg-slate-100 text-slate-600',
-                    en_transito: 'bg-amber-100 text-amber-700',
-                    recibida: 'bg-emerald-100 text-emerald-700',
-                    cancelada: 'bg-rose-100 text-rose-700',
-                }[t.estado] ?? 'bg-slate-100 text-slate-600';
-
-                return `<tr class="hover:bg-slate-50 dark:hover:bg-zinc-800/50 transition-colors">
-                    <td class="px-5 py-3.5 text-sm text-slate-600 dark:text-zinc-300">${t.fecha ?? '—'}</td>
-                    <td class="px-5 py-3.5 text-sm font-medium">${esc(t.almacen_origen?.nombre ?? '—')}</td>
-                    <td class="px-5 py-3.5 text-sm font-medium">${esc(t.almacen_destino?.nombre ?? '—')}</td>
-                    <td class="px-5 py-3.5 text-center text-sm">${t.items_count ?? '—'}</td>
-                    <td class="px-5 py-3.5"><span class="text-xs font-semibold px-2 py-0.5 rounded-full ${estadoBadge}">${t.estado}</span></td>
+                const est = estadoMap[t.estado] ?? { label: t.estado, cls: 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300' };
+                const fechaFmt = t.fecha ? new Date(t.fecha).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+                return `<tr class="border-b border-slate-100 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition-colors">
+                    <td class="px-5 py-3.5 text-sm text-slate-600 dark:text-zinc-300">${esc(fechaFmt)}</td>
+                    <td class="px-5 py-3.5 text-sm font-medium text-slate-800 dark:text-zinc-100">${esc(t.almacen_origen?.nombre ?? '—')}</td>
+                    <td class="px-5 py-3.5 text-sm font-medium text-slate-800 dark:text-zinc-100">${esc(t.almacen_destino?.nombre ?? '—')}</td>
+                    <td class="px-5 py-3.5 text-center text-sm text-slate-600 dark:text-zinc-300">${t.items_count ?? '—'}</td>
+                    <td class="px-5 py-3.5"><span class="text-xs font-semibold px-2 py-0.5 rounded-full ${est.cls}">${est.label}</span></td>
                     <td class="px-5 py-3.5 text-sm text-slate-500 dark:text-zinc-400">${esc(t.user?.name ?? '—')}</td>
-                    <td class="px-5 py-3.5 text-right">
-                        ${t.estado === 'borrador' ? `<button onclick="window._enviarTransferencia(${t.id})" class="text-xs bg-emerald-600 text-white px-3 py-1 rounded-lg hover:bg-emerald-700 transition-colors">Enviar</button>` : ''}
-                        ${t.estado === 'en_transito' ? `<button onclick="window._recibirTransferencia(${t.id})" class="text-xs bg-indigo-600 text-white px-3 py-1 rounded-lg hover:bg-indigo-700 transition-colors">Recibir</button>` : ''}
+                    <td class="px-5 py-3.5 text-right whitespace-nowrap">
+                        ${t.estado === 'borrador' ? `<button data-action="enviar" data-id="${t.id}" class="btn-transferencia-action text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-lg transition-colors">Enviar</button>` : ''}
+                        ${t.estado === 'en_transito' ? `<button data-action="recibir" data-id="${t.id}" class="btn-transferencia-action text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded-lg transition-colors">Recibir</button>` : ''}
+                        ${t.estado === 'borrador' ? `<button data-action="cancelar" data-id="${t.id}" class="btn-transferencia-action ml-1 text-xs bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40 px-3 py-1 rounded-lg transition-colors">Cancelar</button>` : ''}
                     </td>
                 </tr>`;
             }).join('');
+
+            tbody.querySelectorAll('.btn-transferencia-action').forEach(btn => {
+                btn.addEventListener('click', () => handleTransferenciaAction(btn.dataset.action, parseInt(btn.dataset.id)));
+            });
         } catch (err) {
             console.error(err);
         }
     }
 
-    window._enviarTransferencia = async (id) => {
-        if (!confirm('¿Confirmar envío? Se descontará el stock del almacén origen.')) return;
-        try {
-            await api.post(`/api/inventory/transferencias/${id}/enviar`);
-            showToast('Transferencia enviada. En tránsito.');
-            await fetchAndRenderTransferencias();
-            await fetchProducts();
-            renderProducts();
-        } catch (err) {
-            showToast(err.response?.data?.error ?? 'Error al enviar', 'error');
+    async function handleTransferenciaAction(action, id) {
+        if (action === 'enviar') {
+            const ok = await showConfirm('¿Confirmar envío?\nSe descontará el stock del almacén origen.');
+            if (!ok) return;
+            try {
+                await api.post(`/api/inventory/transferencias/${id}/enviar`);
+                showToast('Transferencia enviada. En tránsito.');
+                await Promise.all([fetchAndRenderTransferencias(), fetchProducts()]);
+                renderProducts();
+            } catch (err) {
+                showToast(err.response?.data?.error ?? 'Error al enviar', 'error');
+            }
+        } else if (action === 'recibir') {
+            const ok = await showConfirm('¿Confirmar recepción?\nSe acreditará el stock en el almacén destino.');
+            if (!ok) return;
+            try {
+                await api.post(`/api/inventory/transferencias/${id}/recibir`, { items: [] });
+                showToast('Transferencia recibida.');
+                await Promise.all([fetchAndRenderTransferencias(), fetchProducts()]);
+                renderProducts();
+            } catch (err) {
+                showToast(err.response?.data?.error ?? 'Error al recibir', 'error');
+            }
+        } else if (action === 'cancelar') {
+            const ok = await showConfirm('¿Cancelar esta transferencia en borrador?');
+            if (!ok) return;
+            try {
+                await api.delete(`/api/inventory/transferencias/${id}`);
+                showToast('Transferencia cancelada.');
+                await fetchAndRenderTransferencias();
+            } catch (err) {
+                showToast(err.response?.data?.error ?? 'Error al cancelar', 'error');
+            }
         }
-    };
-
-    window._recibirTransferencia = async (id) => {
-        if (!confirm('¿Confirmar recepción? Se acreditará el stock en el almacén destino.')) return;
-        try {
-            await api.post(`/api/inventory/transferencias/${id}/recibir`, { items: [] });
-            showToast('Transferencia recibida.');
-            await fetchAndRenderTransferencias();
-            await fetchProducts();
-            renderProducts();
-        } catch (err) {
-            showToast(err.response?.data?.error ?? 'Error al recibir', 'error');
-        }
-    };
+    }
 
     // ─── Inventario Físico ─────────────────────────────────────
     async function fetchAndRenderInvFisico() {
