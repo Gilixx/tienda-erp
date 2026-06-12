@@ -1194,8 +1194,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function openImportModal() {
         importForm?.reset();
-        importResult?.classList.add('hidden');
-        importResult.textContent = '';
+        if (importResult) {
+            importResult.classList.add('hidden');
+            importResult.textContent = '';
+        }
         importModal?.classList.remove('hidden');
     }
     function closeImport() {
@@ -1235,8 +1237,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         (data.error_count ? ` · Errores: ${data.error_count}` : '');
             importResult.textContent = msg;
             importResult.className = 'text-sm rounded-xl p-3 ' +
-                (data.error_count ? 'bg-amber-50 text-amber-800 border border-amber-100'
-                                  : 'bg-emerald-50 text-emerald-800 border border-emerald-100');
+                (data.error_count
+                    ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 border border-amber-100 dark:border-amber-800/40'
+                    : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-800/40');
             importResult.classList.remove('hidden');
 
             if (data.errors && data.errors.length) {
@@ -1256,7 +1259,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
             const msg = err.response?.data?.message || 'Error al importar';
             importResult.textContent = msg;
-            importResult.className = 'text-sm rounded-xl p-3 bg-rose-50 text-rose-800 border border-rose-100';
+            importResult.className = 'text-sm rounded-xl p-3 bg-rose-50 dark:bg-rose-900/20 text-rose-800 dark:text-rose-300 border border-rose-100 dark:border-rose-800/40';
             importResult.classList.remove('hidden');
             showToast(msg, 'error');
         } finally {
