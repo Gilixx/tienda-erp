@@ -1041,7 +1041,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const total  = data.total ?? items.length;
 
             if (count) count.textContent = `${total} alerta${total !== 1 ? 's' : ''}`;
-            if (badge && total > 0) badge.classList.remove('hidden');
+            if (badge) badge.classList.toggle('hidden', total === 0);
 
             if (!tbody) return;
             if (!items.length) {
@@ -1050,29 +1050,33 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             tbody.innerHTML = items.map(a => {
                 const tipo = a.tipo === 'bajo_minimo' ? 'Bajo mínimo' : 'Punto reorden';
-                return `<tr class="hover:bg-slate-50 dark:hover:bg-zinc-800/50">
-                    <td class="px-5 py-3 text-sm font-mono text-slate-500">${esc(a.product?.sku ?? '—')}</td>
-                    <td class="px-5 py-3 text-sm font-medium">${esc(a.product?.name ?? '—')}</td>
-                    <td class="px-5 py-3 text-sm text-slate-500">${esc(a.almacen?.nombre ?? 'Global')}</td>
-                    <td class="px-5 py-3"><span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">${tipo}</span></td>
-                    <td class="px-5 py-3 text-center font-mono text-rose-600 font-semibold">${a.stock_actual}</td>
-                    <td class="px-5 py-3 text-center font-mono text-slate-500">${a.stock_minimo}</td>
+                return `<tr class="border-b border-slate-100 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition-colors">
+                    <td class="px-5 py-3 text-sm font-mono text-slate-500 dark:text-zinc-400">${esc(a.product?.sku ?? '—')}</td>
+                    <td class="px-5 py-3 text-sm font-medium text-slate-800 dark:text-zinc-100">${esc(a.product?.name ?? '—')}</td>
+                    <td class="px-5 py-3 text-sm text-slate-500 dark:text-zinc-400">${esc(a.almacen?.nombre ?? 'Global')}</td>
+                    <td class="px-5 py-3"><span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400">${tipo}</span></td>
+                    <td class="px-5 py-3 text-center font-mono text-rose-600 dark:text-rose-400 font-semibold">${a.stock_actual}</td>
+                    <td class="px-5 py-3 text-center font-mono text-slate-500 dark:text-zinc-400">${a.stock_minimo}</td>
                     <td class="px-5 py-3 text-right">
-                        <button onclick="window._resolverAlerta(${a.id}, this)" class="text-xs text-emerald-600 hover:text-emerald-700 font-semibold">Resolver</button>
+                        <button data-id="${a.id}" class="btn-resolver-alerta text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-semibold">Resolver</button>
                     </td>
                 </tr>`;
             }).join('');
+
+            tbody.querySelectorAll('.btn-resolver-alerta').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    btn.disabled = true;
+                    try {
+                        await api.patch(`/api/inventory/alertas/${btn.dataset.id}/resolver`);
+                        btn.closest('tr').remove();
+                        showToast('Alerta resuelta.');
+                    } catch {
+                        btn.disabled = false;
+                    }
+                });
+            });
         } catch (err) { console.error(err); }
     }
-
-    window._resolverAlerta = async (id, btn) => {
-        btn.disabled = true;
-        try {
-            await api.patch(`/api/inventory/alertas/${id}/resolver`);
-            btn.closest('tr').remove();
-            showToast('Alerta resuelta.');
-        } catch { btn.disabled = false; }
-    };
 
     // ─── Tabs (actualizado con nuevos tabs) ────────────────────
     const allSections = {
@@ -1104,14 +1108,32 @@ document.addEventListener('DOMContentLoaded', () => {
         Object.entries(allTabBtns).forEach(([key, btn]) => {
             if (!btn) return;
             const isActive = key === tab;
-            btn.classList.toggle('border-emerald-500', isActive);
-            btn.classList.toggle('text-emerald-600', isActive);
-            btn.classList.toggle('dark:text-emerald-400', isActive);
-            btn.classList.toggle('border-transparent', !isActive);
-            btn.classList.toggle('text-slate-500', !isActive);
+            const isAlertas = key === 'alertas';
+
+            // Reset all variant classes that might toggle
+            btn.classList.remove(
+                'border-emerald-500', 'text-emerald-600', 'dark:text-emerald-400',
+                'border-rose-500', 'text-rose-600', 'dark:text-rose-400',
+                'border-transparent', 'text-slate-500', 'dark:text-zinc-500',
+                'text-rose-500',
+            );
+
+            if (isActive) {
+                if (isAlertas) {
+                    btn.classList.add('border-rose-500', 'text-rose-600', 'dark:text-rose-400');
+                } else {
+                    btn.classList.add('border-emerald-500', 'text-emerald-600', 'dark:text-emerald-400');
+                }
+            } else {
+                btn.classList.add('border-transparent');
+                if (isAlertas) {
+                    btn.classList.add('text-rose-500', 'dark:text-rose-400');
+                } else {
+                    btn.classList.add('text-slate-500', 'dark:text-zinc-500');
+                }
+            }
         });
 
-        // Lazy-load datos del tab activo
         if (tab === 'almacenes') renderAlmacenesGrid();
         if (tab === 'transferencias') fetchAndRenderTransferencias();
         if (tab === 'inv-fisico') fetchAndRenderInvFisico();
