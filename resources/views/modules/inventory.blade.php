@@ -471,6 +471,52 @@
         </div>
     </div>
 
+    <!-- MODAL: ALMACÉN (crear/editar) -->
+    <div id="almacen-modal" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 flex">
+        <div class="absolute inset-0 bg-slate-900/50 dark:bg-black/60 backdrop-blur-sm"></div>
+        <div class="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100 dark:border-zinc-800">
+            <div class="p-6 sm:p-8">
+                <div class="flex justify-between items-center mb-5">
+                    <h3 id="almacen-modal-title" class="text-xl font-bold text-slate-800 dark:text-zinc-50">Nuevo Almacén</h3>
+                    <button type="button" id="close-almacen-modal" class="text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300 transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                @php $inpA = 'w-full rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 focus:bg-white dark:focus:bg-zinc-700 focus:border-emerald-500 focus:ring-emerald-500 transition-colors text-sm placeholder-slate-400 dark:placeholder-zinc-500'; @endphp
+                <form id="almacen-form" class="space-y-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Nombre <span class="text-rose-500">*</span></label>
+                            <input type="text" name="nombre" required maxlength="100" class="{{ $inpA }}">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Código <span class="text-rose-500">*</span></label>
+                            <input type="text" name="codigo" required maxlength="20" placeholder="Ej: BODEGA-A" class="{{ $inpA }}">
+                        </div>
+                        <div class="col-span-2">
+                            <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Descripción</label>
+                            <textarea name="descripcion" rows="2" maxlength="500" class="{{ $inpA }}"></textarea>
+                        </div>
+                        <div class="col-span-2">
+                            <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Dirección</label>
+                            <input type="text" name="direccion" maxlength="500" class="{{ $inpA }}">
+                        </div>
+                        <div class="col-span-2 flex items-center gap-2">
+                            <input type="checkbox" name="activo" id="almacen-activo" checked class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500">
+                            <label for="almacen-activo" class="text-sm text-slate-700 dark:text-zinc-300">Almacén activo</label>
+                        </div>
+                    </div>
+                    <div class="pt-2 flex justify-end gap-3">
+                        <button type="button" id="cancel-almacen-modal"
+                            class="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800 font-medium text-sm transition-colors">Cancelar</button>
+                        <button type="submit"
+                            class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-all">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
 </div>
 @endsection
 

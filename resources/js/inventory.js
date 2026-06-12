@@ -615,6 +615,65 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // ── Modal de almacén (crear/editar) ──
+    let editingAlmacenId = null;
+    const almacenModal      = document.getElementById('almacen-modal');
+    const almacenForm       = document.getElementById('almacen-form');
+    const almacenModalTitle = document.getElementById('almacen-modal-title');
+    const closeAlmacenModalBtn  = document.getElementById('close-almacen-modal');
+    const cancelAlmacenModalBtn = document.getElementById('cancel-almacen-modal');
+
+    function openAlmacenModal(id = null) {
+        editingAlmacenId = id;
+        almacenForm.reset();
+        if (id) {
+            const a = almacenes.find(x => x.id === id);
+            if (!a) return;
+            almacenModalTitle.textContent = 'Editar Almacén';
+            almacenForm.querySelector('[name="nombre"]').value      = a.nombre;
+            almacenForm.querySelector('[name="codigo"]').value      = a.codigo;
+            almacenForm.querySelector('[name="descripcion"]').value = a.descripcion ?? '';
+            almacenForm.querySelector('[name="direccion"]').value   = a.direccion ?? '';
+            almacenForm.querySelector('[name="activo"]').checked    = !!a.activo;
+        } else {
+            almacenModalTitle.textContent = 'Nuevo Almacén';
+            almacenForm.querySelector('[name="activo"]').checked = true;
+        }
+        showModal(almacenModal);
+    }
+
+    document.getElementById('btn-nuevo-almacen')?.addEventListener('click', () => openAlmacenModal());
+    [closeAlmacenModalBtn, cancelAlmacenModalBtn].forEach(el => el?.addEventListener('click', () => hideModal(almacenModal)));
+    almacenModal?.addEventListener('click', (e) => {
+        if (e.target === almacenModal || e.target.classList.contains('absolute')) hideModal(almacenModal);
+    });
+
+    almacenForm?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const data = Object.fromEntries(new FormData(almacenForm));
+        data.activo = almacenForm.querySelector('[name="activo"]').checked;
+        const submitBtn = almacenForm.querySelector('[type="submit"]');
+        submitBtn.disabled = true;
+        try {
+            if (editingAlmacenId) {
+                await api.put(`/api/inventory/almacenes/${editingAlmacenId}`, data);
+                showToast('Almacén actualizado correctamente');
+            } else {
+                await api.post('/api/inventory/almacenes', data);
+                showToast('Almacén creado correctamente');
+            }
+            await fetchAlmacenes();
+            renderAlmacenesGrid();
+            hideModal(almacenModal);
+        } catch (err) {
+            const errors = err.response?.data?.errors;
+            const msg = errors ? Object.values(errors).flat().join(' ') : (err.response?.data?.message || 'Error al guardar el almacén');
+            showToast(msg, 'error');
+        } finally {
+            submitBtn.disabled = false;
+        }
+    });
+
     // ─── Transferencias ────────────────────────────────────────
     async function fetchAndRenderTransferencias() {
         try {
