@@ -566,38 +566,54 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         grid.innerHTML = almacenes.map(a => `
-            <div class="bg-white dark:bg-zinc-900 border border-slate-200/70 dark:border-zinc-800 border-l-[3px] border-l-emerald-500 rounded-2xl p-5">
+            <div class="bg-white dark:bg-zinc-900 border border-slate-200/70 dark:border-zinc-800 border-l-[3px] ${a.es_principal ? 'border-l-amber-500' : 'border-l-emerald-500'} rounded-2xl p-5">
                 <div class="flex items-start justify-between mb-3">
-                    <div>
-                        <p class="font-semibold text-slate-800 dark:text-zinc-100">${esc(a.nombre)}</p>
+                    <div class="min-w-0">
+                        <p class="font-semibold text-slate-800 dark:text-zinc-100 truncate">${esc(a.nombre)}</p>
                         <p class="text-xs text-slate-400 dark:text-zinc-500 font-mono mt-0.5">${esc(a.codigo)}</p>
                     </div>
-                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${a.activo ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}">
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${a.activo
+                        ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
+                        : 'bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400'}">
                         ${a.activo ? 'Activo' : 'Inactivo'}
                     </span>
                 </div>
-                ${a.descripcion ? `<p class="text-xs text-slate-500 dark:text-zinc-400 mb-3">${esc(a.descripcion)}</p>` : ''}
-                <div class="flex gap-4 text-xs text-slate-400 dark:text-zinc-500">
-                    <span>${a.total_productos ?? '—'} SKUs con stock</span>
-                    ${a.es_principal ? '<span class="text-emerald-600 font-semibold">Principal</span>' : ''}
+                ${a.descripcion ? `<p class="text-xs text-slate-500 dark:text-zinc-400 mb-3 line-clamp-2">${esc(a.descripcion)}</p>` : ''}
+                ${a.direccion ? `<p class="text-xs text-slate-400 dark:text-zinc-500 mb-3 truncate"><svg class="inline w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>${esc(a.direccion)}</p>` : ''}
+                <div class="flex items-center justify-between text-xs text-slate-400 dark:text-zinc-500 pt-2 border-t border-slate-100 dark:border-zinc-800">
+                    <span>${a.total_productos ?? 0} SKUs con stock</span>
+                    ${a.es_principal ? '<span class="text-amber-600 dark:text-amber-400 font-semibold">Principal</span>' : ''}
+                </div>
+                <div class="flex gap-2 mt-3">
+                    <button class="btn-editar-almacen flex-1 text-xs px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 font-medium transition-colors" data-id="${a.id}">
+                        Editar
+                    </button>
+                    ${!a.es_principal ? `<button class="btn-eliminar-almacen flex-1 text-xs px-3 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40 font-medium transition-colors" data-id="${a.id}" data-nombre="${esc(a.nombre)}">
+                        Eliminar
+                    </button>` : ''}
                 </div>
             </div>`).join('');
+
+        grid.querySelectorAll('.btn-editar-almacen').forEach(btn =>
+            btn.addEventListener('click', () => openAlmacenModal(parseInt(btn.dataset.id)))
+        );
+        grid.querySelectorAll('.btn-eliminar-almacen').forEach(btn =>
+            btn.addEventListener('click', () => eliminarAlmacen(parseInt(btn.dataset.id), btn.dataset.nombre))
+        );
     }
 
-    document.getElementById('btn-nuevo-almacen')?.addEventListener('click', async () => {
-        const nombre = prompt('Nombre del almacén:');
-        if (!nombre) return;
-        const codigo = prompt('Código (ej: BODEGA-A):');
-        if (!codigo) return;
+    async function eliminarAlmacen(id, nombre) {
+        const ok = await showConfirm(`¿Eliminar el almacén "${nombre}"?\nNo se puede eliminar si tiene stock activo.`);
+        if (!ok) return;
         try {
-            await api.post('/api/inventory/almacenes', { nombre, codigo });
+            await api.delete(`/api/inventory/almacenes/${id}`);
             await fetchAlmacenes();
             renderAlmacenesGrid();
-            showToast('Almacén creado correctamente');
+            showToast('Almacén eliminado correctamente');
         } catch (err) {
-            showToast(err.response?.data?.errors ? Object.values(err.response.data.errors).flat().join(' ') : 'Error al crear almacén', 'error');
+            showToast(err.response?.data?.error || 'Error al eliminar el almacén', 'error');
         }
-    });
+    }
 
     // ─── Transferencias ────────────────────────────────────────
     async function fetchAndRenderTransferencias() {
