@@ -6,26 +6,29 @@
 <div id="finance-app" class="space-y-6">
 
     {{-- Controles superiores --}}
-    <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <div class="flex items-center gap-2">
-            <label class="text-sm font-medium text-slate-600 dark:text-zinc-400">Periodo:</label>
-            <select id="fin-period" class="rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 text-sm focus:border-amber-500 focus:ring-amber-500">
-                <option value="7">Últimos 7 días</option>
-                <option value="30" selected>Últimos 30 días</option>
-                <option value="90">Últimos 90 días</option>
-                <option value="180">Últimos 6 meses</option>
-                <option value="365">Último año</option>
-            </select>
-        </div>
-        <div class="flex gap-2">
-            <button id="btn-nueva-transaccion" class="bg-amber-600 hover:bg-amber-700 active:-translate-y-px text-white px-4 py-2.5 rounded-xl font-semibold text-sm transition-all focus:ring-4 focus:ring-amber-100 dark:focus:ring-amber-900/30 flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
-                Nueva transacción
-            </button>
-            <button id="btn-transferir" class="bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all focus:ring-4 focus:ring-indigo-100 dark:focus:ring-indigo-900/30 flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
-                Transferir
-            </button>
+    <div class="flex flex-col gap-3">
+        <div class="flex flex-wrap gap-2 items-center justify-between">
+            <div class="flex items-center gap-2">
+                <label class="text-sm font-medium text-slate-600 dark:text-zinc-400">Periodo:</label>
+                <select id="fin-period" class="rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 text-sm focus:border-amber-500 focus:ring-amber-500">
+                    <option value="7">7 días</option>
+                    <option value="30" selected>30 días</option>
+                    <option value="90">90 días</option>
+                    <option value="180">6 meses</option>
+                    <option value="365">1 año</option>
+                </select>
+            </div>
+            <div class="flex gap-2 flex-wrap">
+                <button id="btn-nueva-transaccion" class="bg-amber-600 hover:bg-amber-700 active:-translate-y-px text-white px-3 py-2 rounded-xl font-semibold text-sm transition-all focus:ring-4 focus:ring-amber-100 dark:focus:ring-amber-900/30 flex items-center gap-1.5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                    <span class="hidden sm:inline">Nueva transacción</span>
+                    <span class="sm:hidden">Transacción</span>
+                </button>
+                <button id="btn-transferir" class="bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 px-3 py-2 rounded-xl font-semibold text-sm transition-all focus:ring-4 focus:ring-indigo-100 dark:focus:ring-indigo-900/30 flex items-center gap-1.5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                    Transferir
+                </button>
+            </div>
         </div>
     </div>
 
@@ -486,7 +489,7 @@
                     </button>
                 </div>
                 <form id="form-transaccion" class="space-y-4">
-                    <div class="grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label class="{{ $fl }}">Tipo</label>
                             <select name="tipo" required class="{{ $fi }}">
@@ -558,7 +561,7 @@
                         <label class="{{ $fl }}">Hacia</label>
                         <select name="cuenta_destino_id" id="tr-destino" required class="{{ $fi }}"></select>
                     </div>
-                    <div class="grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label class="{{ $fl }}">Monto</label>
                             <input type="number" step="0.01" min="0.01" name="monto" required class="{{ $fi }}">
@@ -623,7 +626,7 @@
                         <select name="categoria_id" id="pp-categoria" required class="{{ $fi }}"></select>
                         <p class="text-xs text-slate-400 dark:text-zinc-500 mt-1">Solo categorías de tipo egreso</p>
                     </div>
-                    <div class="grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label class="{{ $fl }}">Año <span class="text-rose-500">*</span></label>
                             <input type="number" name="anio" min="2020" max="2100" required class="{{ $fi }}">
@@ -676,7 +679,7 @@
                     </button>
                 </div>
                 <form id="form-compra" class="space-y-4">
-                    <div class="grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label class="{{ $fl }}">Proveedor <span class="text-rose-500">*</span></label>
                             <select name="proveedor_id" id="co-proveedor" required class="{{ $fi }}"></select>
@@ -776,7 +779,7 @@
                 </div>
                 <form id="form-proveedor" class="space-y-4">
                     <input type="hidden" name="_id" id="prov-id">
-                    <div class="grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div class="col-span-2">
                             <label class="{{ $fl }}">Nombre / Razón social <span class="text-rose-500">*</span></label>
                             <input type="text" name="nombre" required maxlength="150" class="{{ $fi }}">
@@ -842,7 +845,7 @@
                         <label class="{{ $fl }}">Cuenta</label>
                         <select name="cuenta_id" id="pago-cuenta" required class="{{ $fi }}"></select>
                     </div>
-                    <div class="grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label class="{{ $fl }}">Monto</label>
                             <input type="number" step="0.01" min="0.01" name="monto" required class="{{ $fi }}">
@@ -859,6 +862,194 @@
                     <div class="pt-2 flex justify-end gap-3">
                         <button type="button" class="modal-close {{ $fb }}" data-modal="modal-pago">Cancelar</button>
                         <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 active:-translate-y-px text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-all">Registrar pago</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {{-- MODAL: nuevo activo fijo --}}
+    <div id="modal-activo" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 flex">
+        <div class="absolute inset-0 bg-slate-900/50 dark:bg-black/60 backdrop-blur-sm modal-close" data-modal="modal-activo"></div>
+        <div class="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden border border-slate-100 dark:border-zinc-800 max-h-[90vh] flex flex-col">
+            <div class="p-6 sm:p-8 overflow-y-auto">
+                <div class="flex justify-between items-center mb-5">
+                    <h3 class="text-xl font-bold text-slate-800 dark:text-zinc-50">Nuevo activo fijo</h3>
+                    <button type="button" class="modal-close text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300" data-modal="modal-activo">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <form id="form-activo" class="space-y-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="col-span-full">
+                            <label class="{{ $fl }}">Nombre <span class="text-rose-500">*</span></label>
+                            <input type="text" name="nombre" required maxlength="200" class="{{ $fi }}">
+                        </div>
+                        <div>
+                            <label class="{{ $fl }}">Categoría</label>
+                            <select name="categoria" class="{{ $fi }}">
+                                <option value="">— Seleccionar —</option>
+                                <option value="Edificio">Edificio</option>
+                                <option value="Vehículo">Vehículo</option>
+                                <option value="Equipo">Equipo</option>
+                                <option value="Mobiliario">Mobiliario</option>
+                                <option value="Software">Software</option>
+                                <option value="Otro">Otro</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="{{ $fl }}">Proveedor (opcional)</label>
+                            <select name="proveedor_id" id="af-proveedor" class="{{ $fi }}">
+                                <option value="">— Ninguno —</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="{{ $fl }}">Costo de adquisición <span class="text-rose-500">*</span></label>
+                            <input type="number" step="0.01" min="0" name="costo_adquisicion" required class="{{ $fi }}">
+                        </div>
+                        <div>
+                            <label class="{{ $fl }}">Valor residual</label>
+                            <input type="number" step="0.01" min="0" name="valor_residual" value="0" class="{{ $fi }}">
+                        </div>
+                        <div>
+                            <label class="{{ $fl }}">Fecha adquisición <span class="text-rose-500">*</span></label>
+                            <input type="date" name="fecha_adquisicion" required class="{{ $fi }}">
+                        </div>
+                        <div>
+                            <label class="{{ $fl }}">Vida útil (meses) <span class="text-rose-500">*</span></label>
+                            <input type="number" min="1" name="vida_util_meses" required class="{{ $fi }}">
+                        </div>
+                        <div>
+                            <label class="{{ $fl }}">Método de depreciación <span class="text-rose-500">*</span></label>
+                            <select name="metodo_depreciacion" required class="{{ $fi }}">
+                                <option value="lineal">Lineal</option>
+                                <option value="acelerado">Acelerado</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="{{ $fl }}">Número de serie</label>
+                            <input type="text" name="numero_serie" maxlength="100" class="{{ $fi }}">
+                        </div>
+                        <div class="col-span-full">
+                            <label class="{{ $fl }}">Ubicación</label>
+                            <input type="text" name="ubicacion" maxlength="200" class="{{ $fi }}">
+                        </div>
+                        <div class="col-span-full">
+                            <label class="{{ $fl }}">Notas</label>
+                            <textarea name="notas" rows="2" maxlength="1000" class="{{ $fi }}"></textarea>
+                        </div>
+                    </div>
+                    <div class="pt-2 flex justify-end gap-3">
+                        <button type="button" class="modal-close {{ $fb }}" data-modal="modal-activo">Cancelar</button>
+                        <button type="submit" class="bg-amber-600 hover:bg-amber-700 text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-all">Guardar activo</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {{-- MODAL: devolución de compra --}}
+    <div id="modal-dev-compra" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 flex">
+        <div class="absolute inset-0 bg-slate-900/50 dark:bg-black/60 backdrop-blur-sm modal-close" data-modal="modal-dev-compra"></div>
+        <div class="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-100 dark:border-zinc-800 max-h-[90vh] flex flex-col">
+            <div class="p-6 sm:p-8 overflow-y-auto">
+                <div class="flex justify-between items-center mb-5">
+                    <h3 class="text-xl font-bold text-slate-800 dark:text-zinc-50">Nueva devolución de compra</h3>
+                    <button type="button" class="modal-close text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300" data-modal="modal-dev-compra">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <form id="form-dev-compra" class="space-y-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="col-span-full">
+                            <label class="{{ $fl }}">Compra a devolver <span class="text-rose-500">*</span></label>
+                            <select name="compra_id" id="dc-compra" required class="{{ $fi }}">
+                                <option value="">— Seleccionar compra —</option>
+                            </select>
+                            <p class="text-xs text-slate-400 mt-1">Solo compras recibidas o pagadas.</p>
+                        </div>
+                        <div>
+                            <label class="{{ $fl }}">Fecha <span class="text-rose-500">*</span></label>
+                            <input type="date" name="fecha" required class="{{ $fi }}">
+                        </div>
+                        <div>
+                            <label class="{{ $fl }}">Referencia</label>
+                            <input type="text" name="referencia" maxlength="100" class="{{ $fi }}">
+                        </div>
+                        <div class="col-span-full">
+                            <label class="{{ $fl }}">Motivo</label>
+                            <input type="text" name="motivo" maxlength="500" class="{{ $fi }}">
+                        </div>
+                    </div>
+                    <div id="dc-items-section" class="hidden border-t border-slate-200 dark:border-zinc-700 pt-4">
+                        <div class="flex justify-between items-center mb-3">
+                            <h4 class="text-sm font-semibold text-slate-700 dark:text-zinc-300">Artículos a devolver</h4>
+                            <button type="button" id="dc-add-item" class="text-xs text-amber-600 dark:text-amber-400 hover:text-amber-700 font-medium flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                                Agregar artículo
+                            </button>
+                        </div>
+                        <div id="dc-items" class="space-y-2"></div>
+                    </div>
+                    <div class="pt-2 flex justify-end gap-3">
+                        <button type="button" class="modal-close {{ $fb }}" data-modal="modal-dev-compra">Cancelar</button>
+                        <button type="submit" class="bg-rose-600 hover:bg-rose-700 text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-all">Registrar devolución</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {{-- MODAL: devolución de venta --}}
+    <div id="modal-dev-venta" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 flex">
+        <div class="absolute inset-0 bg-slate-900/50 dark:bg-black/60 backdrop-blur-sm modal-close" data-modal="modal-dev-venta"></div>
+        <div class="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden border border-slate-100 dark:border-zinc-800 max-h-[90vh] flex flex-col">
+            <div class="p-6 sm:p-8 overflow-y-auto">
+                <div class="flex justify-between items-center mb-5">
+                    <h3 class="text-xl font-bold text-slate-800 dark:text-zinc-50">Nueva devolución de venta</h3>
+                    <button type="button" class="modal-close text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300" data-modal="modal-dev-venta">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <form id="form-dev-venta" class="space-y-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="col-span-full">
+                            <label class="{{ $fl }}">ID de la venta <span class="text-rose-500">*</span></label>
+                            <input type="number" min="1" name="venta_id" required placeholder="Ej: 42" class="{{ $fi }}">
+                            <p class="text-xs text-slate-400 mt-1">Solo se permiten ventas con estado "completada".</p>
+                        </div>
+                        <div>
+                            <label class="{{ $fl }}">Fecha <span class="text-rose-500">*</span></label>
+                            <input type="date" name="fecha" required class="{{ $fi }}">
+                        </div>
+                        <div>
+                            <label class="{{ $fl }}">Cuenta reembolso (opcional)</label>
+                            <select name="cuenta_id" id="dv-cuenta" class="{{ $fi }}">
+                                <option value="">— Sin reembolso —</option>
+                            </select>
+                        </div>
+                        <div class="col-span-full">
+                            <label class="{{ $fl }}">Motivo</label>
+                            <input type="text" name="motivo" maxlength="500" class="{{ $fi }}">
+                        </div>
+                        <div class="col-span-full flex items-center gap-2">
+                            <input type="checkbox" name="genera_nota_credito" id="dv-nota-credito" value="1" class="rounded border-slate-300 dark:border-zinc-600">
+                            <label for="dv-nota-credito" class="text-sm text-slate-700 dark:text-zinc-300">Generar nota de crédito</label>
+                        </div>
+                    </div>
+                    <div class="border-t border-slate-200 dark:border-zinc-700 pt-4">
+                        <div class="flex justify-between items-center mb-3">
+                            <h4 class="text-sm font-semibold text-slate-700 dark:text-zinc-300">Artículos devueltos</h4>
+                            <button type="button" id="dv-add-item" class="text-xs text-rose-600 dark:text-rose-400 hover:text-rose-700 font-medium flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                                Agregar artículo
+                            </button>
+                        </div>
+                        <div id="dv-items" class="space-y-2"></div>
+                    </div>
+                    <div class="pt-2 flex justify-end gap-3">
+                        <button type="button" class="modal-close {{ $fb }}" data-modal="modal-dev-venta">Cancelar</button>
+                        <button type="submit" class="bg-rose-600 hover:bg-rose-700 text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-all">Registrar devolución</button>
                     </div>
                 </form>
             </div>

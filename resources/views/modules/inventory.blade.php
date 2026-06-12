@@ -6,7 +6,7 @@
 <div id="inventory-app" class="relative">
 
     <!-- Stats Bar -->
-    <div class="grid grid-cols-3 gap-4 mb-6">
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div class="bg-white dark:bg-zinc-900 border border-slate-200/70 dark:border-zinc-800 border-l-[3px] border-l-emerald-500 rounded-2xl p-4 flex items-center gap-4">
             <div class="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center flex-shrink-0">
                 <svg class="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75">
@@ -228,7 +228,7 @@
                 @php $inp = 'w-full rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 focus:bg-white dark:focus:bg-zinc-700 focus:border-emerald-500 focus:ring-emerald-500 transition-colors text-sm placeholder-slate-400 dark:placeholder-zinc-500'; @endphp
 
                 <form id="product-form" class="space-y-4">
-                    <div class="grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div class="col-span-2">
                             <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Nombre <span class="text-rose-500">*</span></label>
                             <input type="text" name="name" required maxlength="255" class="{{ $inp }}">
@@ -299,7 +299,7 @@
                         </select>
                         <p class="text-xs text-slate-400 dark:text-zinc-500 mt-1">Stock actual: <span id="movement-current-stock" class="font-semibold text-slate-600 dark:text-zinc-300">—</span></p>
                     </div>
-                    <div class="grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Tipo</label>
                             <select name="type" id="movement-type" required class="{{ $inp2 }}">

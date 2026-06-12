@@ -140,6 +140,10 @@ class TransaccionController extends Controller
 
     public function destroy(string $id)
     {
+        if (! auth()->user()->isAdmin()) {
+            return response()->json(['error' => 'Solo administradores pueden eliminar transacciones.'], 403);
+        }
+
         try {
             return DB::transaction(function () use ($id) {
                 $tx = Transaccion::lockForUpdate()->findOrFail($id);

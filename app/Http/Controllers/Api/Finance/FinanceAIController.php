@@ -66,8 +66,8 @@ class FinanceAIController extends Controller
             return response()->json($report + ['cached' => ! $force]);
         } catch (\RuntimeException $e) {
             return response()->json([
-                'message' => $e->getMessage(),
-                'hint'    => 'Verifica que Ollama esté corriendo en ' . config('services.ollama.url'),
+                'message' => 'El servicio de análisis IA no está disponible. Intenta de nuevo en unos minutos.',
+                'hint'    => 'Verifica que el servicio de IA local esté activo.',
             ], 503);
         } catch (\Throwable $e) {
             report($e);

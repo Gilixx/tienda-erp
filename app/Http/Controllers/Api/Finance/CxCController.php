@@ -116,6 +116,10 @@ class CxCController extends Controller
 
     public function destroy(string $id)
     {
+        if (! auth()->user()->isAdmin()) {
+            return response()->json(['error' => 'Solo administradores pueden eliminar cuentas por cobrar.'], 403);
+        }
+
         $cxc = CuentaPorCobrar::findOrFail($id);
         if ($cxc->monto_pagado > 0) {
             return response()->json(['error' => 'No se puede eliminar: ya tiene pagos registrados.'], 422);

@@ -268,6 +268,10 @@ class CompraController extends Controller
 
     public function destroy(string $id)
     {
+        if (! auth()->user()->isAdmin()) {
+            return response()->json(['error' => 'Solo administradores pueden eliminar compras.'], 403);
+        }
+
         $compra = Compra::findOrFail($id);
 
         if ($compra->estado !== 'borrador') {

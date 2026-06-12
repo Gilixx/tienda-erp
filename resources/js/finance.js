@@ -51,11 +51,12 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.tab-btn').forEach(b => {
-                b.classList.remove('border-orange-500', 'text-orange-600');
-                b.classList.add('border-transparent', 'text-slate-500');
+                b.classList.remove('border-amber-500', 'text-amber-600', 'dark:text-amber-400',
+                                   'border-orange-500', 'text-orange-600');
+                b.classList.add('border-transparent', 'text-slate-500', 'dark:text-zinc-500');
             });
-            btn.classList.add('border-orange-500', 'text-orange-600');
-            btn.classList.remove('border-transparent', 'text-slate-500');
+            btn.classList.add('border-amber-500', 'text-amber-600', 'dark:text-amber-400');
+            btn.classList.remove('border-transparent', 'text-slate-500', 'dark:text-zinc-500');
 
             const tab = btn.dataset.tab;
             document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
@@ -1080,6 +1081,245 @@ document.addEventListener('DOMContentLoaded', () => {
             const tab = btn.dataset.tab;
             if (extraTabHandlers[tab]) extraTabHandlers[tab]();
         });
+    });
+
+    // ──── Activos Fijos: crear ─────────────────────────────────
+    document.getElementById('btn-nuevo-activo')?.addEventListener('click', () => {
+        const form = document.getElementById('form-activo');
+        form.reset();
+        form.querySelector('[name=fecha_adquisicion]').value = todayStr();
+        form.querySelector('[name=valor_residual]').value = '0';
+        fillSelect('af-proveedor', proveedores.map(p => ({ value: p.id, label: p.nombre })), true);
+        openModal('modal-activo');
+    });
+
+    document.getElementById('form-activo')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = Object.fromEntries(new FormData(e.target).entries());
+        if (!payload.proveedor_id)       delete payload.proveedor_id;
+        if (!payload.categoria)          delete payload.categoria;
+        if (!payload.numero_serie)       delete payload.numero_serie;
+        if (!payload.ubicacion)          delete payload.ubicacion;
+        if (!payload.notas)              delete payload.notas;
+        try {
+            await api.post('/api/finance/activos-fijos', payload);
+            toast('Activo fijo registrado');
+            closeModal('modal-activo');
+            loadActivosFijos();
+        } catch (err) {
+            const msg = err.response?.data?.message || err.response?.data?.error
+                || Object.values(err.response?.data?.errors || {})[0]?.[0]
+                || 'Error al guardar';
+            toast(msg, 'error');
+        }
+    });
+
+    document.querySelectorAll('.modal-close').forEach(el => {
+        if (el.dataset.modal === 'modal-activo') {
+            el.addEventListener('click', () => closeModal('modal-activo'));
+        }
+    });
+
+    // ──── Devolución de compra: crear ──────────────────────────
+    let comprasDevolucion = [];
+
+    async function abrirDevCompra() {
+        const form = document.getElementById('form-dev-compra');
+        form.reset();
+        form.querySelector('[name=fecha]').value = todayStr();
+        document.getElementById('dc-items').innerHTML = '';
+        document.getElementById('dc-items-section').classList.add('hidden');
+
+        try {
+            // Cargar compras recibidas y pagadas
+            const [r1, r2] = await Promise.all([
+                api.get('/api/finance/compras', { estado: 'recibida', per_page: 100 }),
+                api.get('/api/finance/compras', { estado: 'pagada',   per_page: 100 }),
+            ]);
+            comprasDevolucion = [
+                ...(r1.data?.data || []),
+                ...(r2.data?.data || []),
+            ];
+            const sel = document.getElementById('dc-compra');
+            sel.innerHTML = '<option value="">— Seleccionar compra —</option>';
+            comprasDevolucion.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = `#${c.id} · ${c.proveedor?.nombre || '—'} · ${fmt(c.total, c.moneda?.codigo)} (${c.estado})`;
+                sel.appendChild(opt);
+            });
+        } catch {
+            toast('Error al cargar compras', 'error');
+        }
+        openModal('modal-dev-compra');
+    }
+
+    document.getElementById('btn-nueva-dev-compra')?.addEventListener('click', abrirDevCompra);
+
+    // Al seleccionar una compra, cargar sus ítems
+    document.getElementById('dc-compra')?.addEventListener('change', async (e) => {
+        const id = e.target.value;
+        const section = document.getElementById('dc-items-section');
+        const cont    = document.getElementById('dc-items');
+        cont.innerHTML = '';
+        if (!id) { section.classList.add('hidden'); return; }
+
+        try {
+            const { data } = await api.get(`/api/finance/compras/${id}`);
+            section.classList.remove('hidden');
+            // Pre-poblar con los ítems de la compra
+            (data.items || []).forEach(item => {
+                addDcItem(item.product_id, item.product?.name, item.cantidad, item.costo_unit, item.id);
+            });
+        } catch {
+            section.classList.remove('hidden');
+            toast('No se pudieron cargar los ítems de la compra', 'warn');
+        }
+    });
+
+    function addDcItem(productId = '', productName = '', cantMax = '', costoUnit = '', compraItemId = '') {
+        const cont = document.getElementById('dc-items');
+        const row  = document.createElement('div');
+        row.className = 'grid grid-cols-12 gap-2 items-end bg-slate-50 dark:bg-zinc-800 rounded-xl p-2';
+        row.innerHTML = `
+            <div class="col-span-5">
+                <label class="text-xs text-slate-500 dark:text-zinc-400">Producto</label>
+                <select class="dc-prod w-full rounded-lg border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs" required>
+                    <option value="">— Seleccionar —</option>
+                    ${productos.map(p => `<option value="${p.id}" ${p.id == productId ? 'selected' : ''}>${esc(p.sku)} · ${esc(p.name)}</option>`).join('')}
+                </select>
+                <input type="hidden" class="dc-item-id" value="${esc(String(compraItemId))}">
+            </div>
+            <div class="col-span-3">
+                <label class="text-xs text-slate-500 dark:text-zinc-400">Cant. devolver</label>
+                <input type="number" min="0.0001" step="0.0001" value="${esc(String(cantMax))}" class="dc-qty w-full rounded-lg border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs" required>
+            </div>
+            <div class="col-span-3">
+                <label class="text-xs text-slate-500 dark:text-zinc-400">Costo unit</label>
+                <input type="number" min="0" step="0.01" value="${esc(String(costoUnit))}" class="dc-cost w-full rounded-lg border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs" required>
+            </div>
+            <div class="col-span-1 text-right">
+                <button type="button" class="dc-rem text-rose-500 hover:text-rose-700 text-lg leading-none">×</button>
+            </div>`;
+        cont.appendChild(row);
+        row.querySelector('.dc-rem').addEventListener('click', () => row.remove());
+    }
+
+    document.getElementById('dc-add-item')?.addEventListener('click', () => addDcItem());
+
+    document.getElementById('form-dev-compra')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const compraId = document.getElementById('dc-compra').value;
+        if (!compraId) { toast('Selecciona una compra', 'warn'); return; }
+
+        const items = [];
+        document.querySelectorAll('#dc-items > div').forEach(row => {
+            const product_id        = row.querySelector('.dc-prod').value;
+            const cantidad_devuelta = parseFloat(row.querySelector('.dc-qty').value);
+            const costo_unit        = parseFloat(row.querySelector('.dc-cost').value);
+            const compra_item_id    = row.querySelector('.dc-item-id').value || null;
+            if (product_id && cantidad_devuelta > 0) {
+                items.push({ product_id: parseInt(product_id), cantidad_devuelta, costo_unit, compra_item_id });
+            }
+        });
+        if (!items.length) { toast('Agrega al menos un artículo', 'warn'); return; }
+
+        const fd = new FormData(e.target);
+        const payload = Object.fromEntries(fd.entries());
+        payload.compra_id = parseInt(compraId);
+        payload.items = items;
+        if (!payload.referencia) delete payload.referencia;
+        if (!payload.motivo)     delete payload.motivo;
+
+        try {
+            await api.post('/api/finance/devoluciones-compra', payload);
+            toast('Devolución registrada y aplicada');
+            closeModal('modal-dev-compra');
+            loadDevCompras();
+            loadStats();
+            await loadCatalogos();
+        } catch (err) {
+            const msg = err.response?.data?.error || err.response?.data?.message
+                || Object.values(err.response?.data?.errors || {})[0]?.[0]
+                || 'Error al registrar';
+            toast(msg, 'error');
+        }
+    });
+
+    // ──── Devolución de venta: crear ──────────────────────────
+    document.getElementById('btn-nueva-dev-venta')?.addEventListener('click', () => {
+        const form = document.getElementById('form-dev-venta');
+        form.reset();
+        form.querySelector('[name=fecha]').value = todayStr();
+        document.getElementById('dv-items').innerHTML = '';
+        fillSelect('dv-cuenta', cuentas.filter(c => c.activa).map(c => ({ value: c.id, label: `${c.nombre} (${c.moneda?.codigo || '—'})` })), true);
+        addDvItem(); // primer ítem vacío
+        openModal('modal-dev-venta');
+    });
+
+    function addDvItem() {
+        const cont = document.getElementById('dv-items');
+        const row  = document.createElement('div');
+        row.className = 'grid grid-cols-12 gap-2 items-end bg-slate-50 dark:bg-zinc-800 rounded-xl p-2';
+        row.innerHTML = `
+            <div class="col-span-5">
+                <label class="text-xs text-slate-500 dark:text-zinc-400">Producto</label>
+                <select class="dv-prod w-full rounded-lg border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs" required>
+                    <option value="">— Seleccionar —</option>
+                    ${productos.map(p => `<option value="${p.id}">${esc(p.sku)} · ${esc(p.name)}</option>`).join('')}
+                </select>
+            </div>
+            <div class="col-span-3">
+                <label class="text-xs text-slate-500 dark:text-zinc-400">Cantidad</label>
+                <input type="number" min="0.0001" step="0.0001" class="dv-qty w-full rounded-lg border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs" required>
+            </div>
+            <div class="col-span-3">
+                <label class="text-xs text-slate-500 dark:text-zinc-400">Precio unit</label>
+                <input type="number" min="0" step="0.01" class="dv-price w-full rounded-lg border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs" required>
+            </div>
+            <div class="col-span-1 text-right">
+                <button type="button" class="dv-rem text-rose-500 hover:text-rose-700 text-lg leading-none">×</button>
+            </div>`;
+        cont.appendChild(row);
+        row.querySelector('.dv-rem').addEventListener('click', () => row.remove());
+    }
+
+    document.getElementById('dv-add-item')?.addEventListener('click', addDvItem);
+
+    document.getElementById('form-dev-venta')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const items = [];
+        document.querySelectorAll('#dv-items > div').forEach(row => {
+            const product_id        = row.querySelector('.dv-prod').value;
+            const cantidad_devuelta = parseFloat(row.querySelector('.dv-qty').value);
+            const precio_unit       = parseFloat(row.querySelector('.dv-price').value);
+            if (product_id && cantidad_devuelta > 0) {
+                items.push({ product_id: parseInt(product_id), cantidad_devuelta, precio_unit });
+            }
+        });
+        if (!items.length) { toast('Agrega al menos un artículo', 'warn'); return; }
+
+        const fd = new FormData(e.target);
+        const payload = Object.fromEntries(fd.entries());
+        payload.venta_id = parseInt(payload.venta_id);
+        payload.items    = items;
+        payload.genera_nota_credito = payload.genera_nota_credito === '1';
+        if (!payload.cuenta_id) delete payload.cuenta_id;
+        if (!payload.motivo)    delete payload.motivo;
+
+        try {
+            await api.post('/api/finance/devoluciones-venta', payload);
+            toast('Devolución de venta registrada');
+            closeModal('modal-dev-venta');
+            loadDevVentas();
+            loadStats();
+            await loadCatalogos();
+        } catch (err) {
+            const msg = err.response?.data?.error || err.response?.data?.message
+                || Object.values(err.response?.data?.errors || {})[0]?.[0]
+                || 'Error al registrar';
+            toast(msg, 'error');
+        }
     });
 
     // ──── Eventos globales ─────────────────────────────────────

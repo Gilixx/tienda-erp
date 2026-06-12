@@ -39,10 +39,10 @@ class SecurityHeaders
             // Relaxed CSP for local development (Vite HMR)
             $response->headers->set('Content-Security-Policy', "default-src * 'unsafe-inline' 'unsafe-eval' data: blob: ws: wss:;");
         } else {
-            // Content Security Policy — strict for production
+            // Content Security Policy — unsafe-eval removed; unsafe-inline kept for Blade inline handlers
             $csp = implode('; ', [
                 "default-src 'self'",
-                "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+                "script-src 'self' 'unsafe-inline'",
                 "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
                 "font-src 'self' https://fonts.gstatic.com",
                 "img-src 'self' data:",
@@ -53,6 +53,8 @@ class SecurityHeaders
                 "form-action 'self'",
             ]);
             $response->headers->set('Content-Security-Policy', $csp);
+            // HSTS — tell browsers to only use HTTPS (max 1 year)
+            $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
         }
 
         return $response;
