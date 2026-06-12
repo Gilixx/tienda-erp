@@ -265,37 +265,41 @@ document.addEventListener('DOMContentLoaded', () => {
         if (list.length === 0) {
             productsTbody.innerHTML = `
                 <tr><td colspan="8" class="px-6 py-12 text-center">
-                    <svg class="w-10 h-10 mx-auto mb-3 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
-                    <p class="text-slate-400 text-sm">${state.searchQuery ? 'Sin resultados para tu búsqueda.' : 'No hay productos registrados.'}</p>
+                    <svg class="w-10 h-10 mx-auto mb-3 text-slate-200 dark:text-zinc-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
+                    <p class="text-slate-400 dark:text-zinc-500 text-sm">${state.searchQuery ? 'Sin resultados para tu búsqueda.' : 'No hay productos registrados.'}</p>
                 </td></tr>`;
             return;
         }
 
         productsTbody.innerHTML = list.map(p => {
             const isLow     = p.stock <= p.min_stock;
-            const badgeCls  = isLow ? 'bg-red-100 text-red-700 border-red-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200';
+            const badgeCls  = isLow
+                ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800/50'
+                : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50';
             const badgeTxt  = isLow ? 'Stock Bajo' : 'Normal';
-            const stockCls  = isLow ? 'text-red-600 font-bold' : 'text-slate-700 font-semibold';
+            const stockCls  = isLow
+                ? 'text-red-600 dark:text-red-400 font-bold'
+                : 'text-slate-700 dark:text-zinc-200 font-semibold';
 
             return `
-            <tr class="border-b border-slate-100 hover:bg-slate-50/60 transition-colors">
-                <td class="px-5 py-3 whitespace-nowrap text-xs font-mono text-slate-500">${esc(p.sku)}</td>
-                <td class="px-5 py-3 whitespace-nowrap text-sm font-medium text-slate-900">${esc(p.name)}</td>
-                <td class="px-5 py-3 whitespace-nowrap text-sm text-slate-500">${esc(p.category?.name || '—')}</td>
-                <td class="px-5 py-3 whitespace-nowrap text-sm font-semibold text-slate-800">$${fmt(p.price)}</td>
-                <td class="px-5 py-3 whitespace-nowrap text-sm text-slate-500">$${fmt(p.cost)}</td>
+            <tr class="border-b border-slate-100 dark:border-zinc-800 hover:bg-slate-50/60 dark:hover:bg-zinc-800/40 transition-colors">
+                <td class="px-5 py-3 whitespace-nowrap text-xs font-mono text-slate-500 dark:text-zinc-400">${esc(p.sku)}</td>
+                <td class="px-5 py-3 whitespace-nowrap text-sm font-medium text-slate-900 dark:text-zinc-100">${esc(p.name)}</td>
+                <td class="px-5 py-3 whitespace-nowrap text-sm text-slate-500 dark:text-zinc-400">${esc(p.category?.name || '—')}</td>
+                <td class="px-5 py-3 whitespace-nowrap text-sm font-semibold text-slate-800 dark:text-zinc-100">$${fmt(p.price)}</td>
+                <td class="px-5 py-3 whitespace-nowrap text-sm text-slate-500 dark:text-zinc-400">$${fmt(p.cost)}</td>
                 <td class="px-5 py-3 whitespace-nowrap text-sm ${stockCls}">${p.stock}</td>
                 <td class="px-5 py-3 whitespace-nowrap">
                     <span class="px-2.5 py-1 inline-flex text-xs font-semibold rounded-full border ${badgeCls}">${badgeTxt}</span>
                 </td>
                 <td class="px-5 py-3 whitespace-nowrap text-right">
-                    <button class="btn-edit p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" data-id="${p.id}" title="Editar producto">
+                    <button class="btn-edit p-1.5 rounded-lg text-slate-400 dark:text-zinc-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors" data-id="${p.id}" title="Editar producto">
                         <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                     </button>
-                    <button class="btn-move p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors" data-id="${p.id}" title="Mover stock">
+                    <button class="btn-move p-1.5 rounded-lg text-slate-400 dark:text-zinc-500 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors" data-id="${p.id}" title="Mover stock">
                         <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
                     </button>
-                    <button class="btn-delete p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors" data-id="${p.id}" title="Eliminar producto">
+                    <button class="btn-delete p-1.5 rounded-lg text-slate-400 dark:text-zinc-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-colors" data-id="${p.id}" title="Eliminar producto">
                         <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                     </button>
                 </td>
