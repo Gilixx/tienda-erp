@@ -1,0 +1,24 @@
+<?php
+
+namespace App\Http\Controllers\Api\Inventory\Concerns;
+
+use App\Models\Inventory\Almacen;
+use Symfony\Component\HttpKernel\Exception\HttpException;
+
+trait AuthorizesAlmacen
+{
+    /**
+     * Carga el almacén y aborta con 403 si el usuario actual no tiene acceso.
+     * Devuelve el modelo para reutilizarlo en el controlador.
+     */
+    protected function authorizeAlmacen($almacenId): Almacen
+    {
+        $almacen = Almacen::findOrFail($almacenId);
+
+        if (! $almacen->accesiblePara(request()->user())) {
+            throw new HttpException(403, 'No tienes acceso a este almacén.');
+        }
+
+        return $almacen;
+    }
+}

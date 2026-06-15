@@ -4,6 +4,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const app = document.getElementById('inventory-app');
     if (!app) return;
 
+    // ─── Auth (para permisos de almacén) ──────────────────────
+    const auth = {
+        id: parseInt(app.dataset.userId) || null,
+        isAdmin: app.dataset.isAdmin === '1',
+    };
+
     // ─── State ────────────────────────────────────────────────
     const state = {
         products: [],
@@ -13,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
         searchQuery: '',
         currentTab: 'products',
         editingProductId: null,
+        selectedAlmacen: localStorage.getItem('inventory_almacen') || null,
     };
 
     // ─── DOM refs ─────────────────────────────────────────────
@@ -135,7 +142,9 @@ document.addEventListener('DOMContentLoaded', () => {
     async function init() {
         showLoading();
         try {
-            await Promise.all([fetchCategories(), fetchProducts(), fetchMovements(), fetchAlmacenes()]);
+            // Almacenes primero para resolver el almacén activo antes de pedir productos/movimientos
+            await Promise.all([fetchCategories(), fetchAlmacenes()]);
+            await Promise.all([fetchProducts(), fetchMovements()]);
             renderStats();
             renderCategories();
             renderProducts();
@@ -154,7 +163,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ─── Fetches ───────────────────────────────────────────────
     async function fetchProducts() {
-        const { data } = await api.get('/api/inventory/products');
+        const params = state.selectedAlmacen ? `?almacen_id=${state.selectedAlmacen}` : '';
+        const { data } = await api.get(`/api/inventory/products${params}`);
         state.products = data;
     }
 
@@ -164,7 +174,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function fetchMovements() {
-        const { data } = await api.get('/api/inventory/movements');
+        const params = state.selectedAlmacen ? `?almacen_id=${state.selectedAlmacen}` : '';
+        const { data } = await api.get(`/api/inventory/movements${params}`);
         state.movements = data;
     }
 
@@ -485,6 +496,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function openMovementModal(productId) {
         movementForm.reset();
         if (movementProductSelect) movementProductSelect.value = productId;
+        const movementAlmacenSel = document.getElementById('movement-almacen');
+        if (movementAlmacenSel && state.selectedAlmacen) movementAlmacenSel.value = state.selectedAlmacen;
         syncMovementStockDisplay();
         syncMovementTypeUI();
         showModal(movementModal);
@@ -518,16 +531,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             const res = await api.post('/api/inventory/movements', data);
-            // Sync local stock from server response
-            const updatedProduct = res.data.product;
-            if (updatedProduct) {
-                const idx = state.products.findIndex(p => p.id == updatedProduct.id);
-                if (idx !== -1) state.products[idx] = { ...state.products[idx], stock: updatedProduct.stock };
-            }
             state.movements.unshift(res.data);
+            // Refrescar stock por almacén activo (el response no incluye el stock por almacén)
+            await fetchProducts();
             renderStats();
             renderProducts();
             renderMovements();
+            populateProductSelects();
             hideModal(movementModal);
             showToast('Movimiento registrado correctamente');
         } catch (err) {
@@ -544,7 +554,17 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchAlmacenes() {
         const { data } = await api.get('/api/inventory/almacenes');
         almacenes = data;
+
+        // Resolver almacén activo: el guardado si sigue accesible, si no el Principal o el primero
+        const ids = almacenes.map(a => String(a.id));
+        if (!state.selectedAlmacen || !ids.includes(String(state.selectedAlmacen))) {
+            const principal = almacenes.find(a => a.es_principal) || almacenes[0];
+            state.selectedAlmacen = principal ? String(principal.id) : null;
+            if (state.selectedAlmacen) localStorage.setItem('inventory_almacen', state.selectedAlmacen);
+        }
+
         populateAlmacenSelects();
+        populateGlobalAlmacenSelector();
     }
 
     function populateAlmacenSelects() {
@@ -553,8 +573,43 @@ document.addEventListener('DOMContentLoaded', () => {
             sel.innerHTML = almacenes.map(a =>
                 `<option value="${a.id}">${esc(a.nombre)} (${esc(a.codigo)})</option>`
             ).join('');
+            if (state.selectedAlmacen) sel.value = state.selectedAlmacen;
         }
     }
+
+    // ── Selector global de almacén activo ──
+    const globalAlmacenSelector = document.getElementById('almacen-selector');
+
+    function populateGlobalAlmacenSelector() {
+        if (!globalAlmacenSelector) return;
+        if (!almacenes.length) {
+            globalAlmacenSelector.innerHTML = '<option value="">Sin almacenes</option>';
+            return;
+        }
+        globalAlmacenSelector.innerHTML = almacenes.map(a =>
+            `<option value="${a.id}">${esc(a.nombre)} (${esc(a.codigo)})${a.es_principal ? ' ★' : ''}</option>`
+        ).join('');
+        if (state.selectedAlmacen) globalAlmacenSelector.value = state.selectedAlmacen;
+    }
+
+    globalAlmacenSelector?.addEventListener('change', async () => {
+        state.selectedAlmacen = globalAlmacenSelector.value || null;
+        if (state.selectedAlmacen) localStorage.setItem('inventory_almacen', state.selectedAlmacen);
+        else localStorage.removeItem('inventory_almacen');
+
+        // Sincronizar selects dependientes y recargar datos del almacén activo
+        populateAlmacenSelects();
+        try {
+            await Promise.all([fetchProducts(), fetchMovements()]);
+            renderStats();
+            renderCategories();
+            renderProducts();
+            renderMovements();
+            fetchAndRenderAlertas().catch(() => {});
+        } catch (err) {
+            showToast('Error al cambiar de almacén', 'error');
+        }
+    });
 
     function renderAlmacenesGrid() {
         const grid = document.getElementById('almacenes-grid');
@@ -585,10 +640,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     ${a.es_principal ? '<span class="text-amber-600 dark:text-amber-400 font-semibold">Principal</span>' : ''}
                 </div>
                 <div class="flex gap-2 mt-3">
-                    <button class="btn-editar-almacen flex-1 text-xs px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 font-medium transition-colors" data-id="${a.id}">
+                    ${a.puede_gestionar ? `<button class="btn-editar-almacen flex-1 text-xs px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 font-medium transition-colors" data-id="${a.id}">
                         Editar
-                    </button>
-                    ${!a.es_principal ? `<button class="btn-eliminar-almacen flex-1 text-xs px-3 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40 font-medium transition-colors" data-id="${a.id}" data-nombre="${esc(a.nombre)}">
+                    </button>` : ''}
+                    ${a.puede_gestionar ? `<button class="btn-permisos-almacen flex-1 text-xs px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40 font-medium transition-colors" data-id="${a.id}" data-nombre="${esc(a.nombre)}">
+                        Permisos
+                    </button>` : ''}
+                    ${(a.puede_gestionar && !a.es_principal) ? `<button class="btn-eliminar-almacen flex-1 text-xs px-3 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40 font-medium transition-colors" data-id="${a.id}" data-nombre="${esc(a.nombre)}">
                         Eliminar
                     </button>` : ''}
                 </div>
@@ -599,6 +657,9 @@ document.addEventListener('DOMContentLoaded', () => {
         );
         grid.querySelectorAll('.btn-eliminar-almacen').forEach(btn =>
             btn.addEventListener('click', () => eliminarAlmacen(parseInt(btn.dataset.id), btn.dataset.nombre))
+        );
+        grid.querySelectorAll('.btn-permisos-almacen').forEach(btn =>
+            btn.addEventListener('click', () => openPermisosModal(parseInt(btn.dataset.id), btn.dataset.nombre))
         );
     }
 
@@ -672,6 +733,90 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             submitBtn.disabled = false;
         }
+    });
+
+    // ── Modal de permisos de almacén ──
+    const permisosModal      = document.getElementById('permisos-modal');
+    const permisosNombre     = document.getElementById('permisos-almacen-nombre');
+    const permisosLista      = document.getElementById('permisos-lista');
+    const permisosAddSelect  = document.getElementById('permisos-add-select');
+    const permisosAddBtn     = document.getElementById('permisos-add-btn');
+    const closePermisosBtn   = document.getElementById('close-permisos-modal');
+    let permisosAlmacenId = null;
+
+    async function openPermisosModal(id, nombre) {
+        permisosAlmacenId = id;
+        permisosNombre.textContent = nombre;
+        permisosLista.innerHTML = '<li class="text-sm text-slate-400 dark:text-zinc-500">Cargando…</li>';
+        permisosAddSelect.innerHTML = '<option value="">Selecciona un usuario…</option>';
+        showModal(permisosModal);
+        await Promise.all([cargarPermisosLista(), cargarPermisosDisponibles()]);
+    }
+
+    async function cargarPermisosLista() {
+        try {
+            const { data } = await api.get(`/api/inventory/almacenes/${permisosAlmacenId}/usuarios`);
+            if (!data.length) {
+                permisosLista.innerHTML = '<li class="text-sm text-slate-400 dark:text-zinc-500">Sin usuarios.</li>';
+                return;
+            }
+            permisosLista.innerHTML = data.map(u => `
+                <li class="flex items-center justify-between gap-3 bg-slate-50 dark:bg-zinc-800/60 rounded-xl px-3 py-2">
+                    <div class="min-w-0">
+                        <p class="text-sm font-medium text-slate-800 dark:text-zinc-100 truncate">${esc(u.name)}${u.es_creador ? ' <span class="text-[10px] font-bold text-amber-600 dark:text-amber-400">DUEÑO</span>' : ''}</p>
+                        <p class="text-xs text-slate-400 dark:text-zinc-500 truncate">${esc(u.email)}</p>
+                    </div>
+                    ${u.es_creador ? '' : `<button class="btn-quitar-permiso text-xs text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 font-semibold flex-shrink-0" data-id="${u.id}">Quitar</button>`}
+                </li>`).join('');
+
+            permisosLista.querySelectorAll('.btn-quitar-permiso').forEach(btn =>
+                btn.addEventListener('click', () => quitarPermiso(parseInt(btn.dataset.id)))
+            );
+        } catch (err) {
+            permisosLista.innerHTML = '<li class="text-sm text-rose-500">Error al cargar.</li>';
+        }
+    }
+
+    async function cargarPermisosDisponibles() {
+        try {
+            const { data } = await api.get(`/api/inventory/almacenes/${permisosAlmacenId}/usuarios-disponibles`);
+            permisosAddSelect.innerHTML = '<option value="">Selecciona un usuario…</option>' +
+                data.map(u => `<option value="${u.id}">${esc(u.name)} — ${esc(u.email)}</option>`).join('');
+        } catch (err) {
+            // silencioso
+        }
+    }
+
+    permisosAddBtn?.addEventListener('click', async () => {
+        const userId = permisosAddSelect.value;
+        if (!userId) return;
+        permisosAddBtn.disabled = true;
+        try {
+            await api.post(`/api/inventory/almacenes/${permisosAlmacenId}/usuarios`, { user_id: parseInt(userId) });
+            showToast('Acceso concedido.');
+            await Promise.all([cargarPermisosLista(), cargarPermisosDisponibles()]);
+        } catch (err) {
+            showToast(err.response?.data?.error || 'Error al conceder acceso', 'error');
+        } finally {
+            permisosAddBtn.disabled = false;
+        }
+    });
+
+    async function quitarPermiso(userId) {
+        const ok = await showConfirm('¿Revocar el acceso de este usuario al almacén?');
+        if (!ok) return;
+        try {
+            await api.delete(`/api/inventory/almacenes/${permisosAlmacenId}/usuarios/${userId}`);
+            showToast('Acceso revocado.');
+            await Promise.all([cargarPermisosLista(), cargarPermisosDisponibles()]);
+        } catch (err) {
+            showToast(err.response?.data?.error || 'Error al revocar acceso', 'error');
+        }
+    }
+
+    closePermisosBtn?.addEventListener('click', () => hideModal(permisosModal));
+    permisosModal?.addEventListener('click', (e) => {
+        if (e.target === permisosModal || e.target.classList.contains('absolute')) hideModal(permisosModal);
     });
 
     // ─── Transferencias ────────────────────────────────────────
@@ -785,7 +930,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const opts = almacenes.filter(a => a.activo).map(a => `<option value="${a.id}">${esc(a.nombre)} (${esc(a.codigo)})</option>`).join('');
         transfOrigen.innerHTML  = opts;
         transfDestino.innerHTML = opts;
-        if (almacenes.length >= 2) transfDestino.value = almacenes[1].id;
+        // Origen por defecto: el almacén activo
+        if (state.selectedAlmacen) transfOrigen.value = state.selectedAlmacen;
+        // Destino: el primero distinto al origen
+        const destino = almacenes.find(a => a.activo && String(a.id) !== String(transfOrigen.value));
+        if (destino) transfDestino.value = destino.id;
         transfFecha.value = new Date().toISOString().slice(0, 10);
         transfItemsContainer.innerHTML = '';
         renderTransfItemRow();
@@ -916,6 +1065,7 @@ document.addEventListener('DOMContentLoaded', () => {
         invFisicoForm.reset();
         invFisicoAlmacen.innerHTML = almacenes.filter(a => a.activo)
             .map(a => `<option value="${a.id}">${esc(a.nombre)} (${esc(a.codigo)})</option>`).join('');
+        if (state.selectedAlmacen) invFisicoAlmacen.value = state.selectedAlmacen;
         showModal(invFisicoModal);
     });
 
@@ -1033,7 +1183,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // ─── Alertas de Stock ──────────────────────────────────────
     async function fetchAndRenderAlertas() {
         try {
-            const { data } = await api.get('/api/inventory/alertas');
+            const params = state.selectedAlmacen ? `?almacen_id=${state.selectedAlmacen}` : '';
+            const { data } = await api.get(`/api/inventory/alertas${params}`);
             const tbody  = document.getElementById('tbody-alertas');
             const count  = document.getElementById('alertas-count');
             const badge  = document.getElementById('alertas-badge');

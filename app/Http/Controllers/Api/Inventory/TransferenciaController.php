@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers\Api\Inventory;
 
+use App\Http\Controllers\Api\Inventory\Concerns\AuthorizesAlmacen;
 use App\Http\Controllers\Controller;
-use App\Models\InventoryMovement;
 use App\Models\Inventory\Almacen;
 use App\Models\Inventory\ProductStock;
 use App\Models\Inventory\TransferenciaAlmacen;
-use App\Models\Inventory\TransferenciaItem;
+use App\Models\InventoryMovement;
 use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,23 +15,32 @@ use Illuminate\Support\Facades\DB;
 
 class TransferenciaController extends Controller
 {
+    use AuthorizesAlmacen;
+
     /** GET /api/inventory/transferencias */
     public function index(Request $request): JsonResponse
     {
+        $accesibles = Almacen::accesiblesPara($request->user())->pluck('id');
+
         $query = TransferenciaAlmacen::with([
             'almacenOrigen:id,nombre,codigo',
             'almacenDestino:id,nombre,codigo',
             'user:id,name',
-        ])->latest('fecha')->latest('id');
+        ])
+            // Solo transferencias que toquen un almacén accesible
+            ->where(fn ($q) => $q->whereIn('almacen_origen_id', $accesibles)
+                ->orWhereIn('almacen_destino_id', $accesibles)
+            )
+            ->latest('fecha')->latest('id');
 
         if ($request->filled('estado')) {
             $query->where('estado', $request->input('estado'));
         }
         if ($request->filled('almacen_id')) {
             $almId = $request->integer('almacen_id');
-            $query->where(fn($q) =>
-                $q->where('almacen_origen_id', $almId)
-                  ->orWhere('almacen_destino_id', $almId)
+            $this->authorizeAlmacen($almId);
+            $query->where(fn ($q) => $q->where('almacen_origen_id', $almId)
+                ->orWhere('almacen_destino_id', $almId)
             );
         }
         if ($request->filled('desde')) {
@@ -55,6 +64,9 @@ class TransferenciaController extends Controller
             'items.product:id,name,sku',
         ])->findOrFail($id);
 
+        $this->authorizeAlmacen($transferencia->almacen_origen_id);
+        $this->authorizeAlmacen($transferencia->almacen_destino_id);
+
         return response()->json($transferencia);
     }
 
@@ -62,32 +74,35 @@ class TransferenciaController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'almacen_origen_id'  => 'required|exists:almacenes,id',
+            'almacen_origen_id' => 'required|exists:almacenes,id',
             'almacen_destino_id' => 'required|exists:almacenes,id|different:almacen_origen_id',
-            'fecha'              => 'required|date',
-            'referencia'         => 'nullable|string|max:100',
-            'notas'              => 'nullable|string|max:1000',
-            'items'              => 'required|array|min:1',
+            'fecha' => 'required|date',
+            'referencia' => 'nullable|string|max:100',
+            'notas' => 'nullable|string|max:1000',
+            'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
-            'items.*.cantidad'   => 'required|integer|min:1',
+            'items.*.cantidad' => 'required|integer|min:1',
         ]);
+
+        $this->authorizeAlmacen($validated['almacen_origen_id']);
+        $this->authorizeAlmacen($validated['almacen_destino_id']);
 
         try {
             return DB::transaction(function () use ($validated) {
                 $transferencia = TransferenciaAlmacen::create([
-                    'almacen_origen_id'  => $validated['almacen_origen_id'],
+                    'almacen_origen_id' => $validated['almacen_origen_id'],
                     'almacen_destino_id' => $validated['almacen_destino_id'],
-                    'user_id'            => auth()->id(),
-                    'estado'             => 'borrador',
-                    'fecha'              => $validated['fecha'],
-                    'referencia'         => $validated['referencia'] ?? null,
-                    'notas'              => $validated['notas'] ?? null,
+                    'user_id' => auth()->id(),
+                    'estado' => 'borrador',
+                    'fecha' => $validated['fecha'],
+                    'referencia' => $validated['referencia'] ?? null,
+                    'notas' => $validated['notas'] ?? null,
                 ]);
 
                 foreach ($validated['items'] as $row) {
                     $transferencia->items()->create([
                         'product_id' => $row['product_id'],
-                        'cantidad'   => $row['cantidad'],
+                        'cantidad' => $row['cantidad'],
                     ]);
                 }
 
@@ -98,7 +113,8 @@ class TransferenciaController extends Controller
             });
         } catch (\Throwable $e) {
             report($e);
-            return response()->json(['error' => 'Error al crear la transferencia: ' . $e->getMessage()], 500);
+
+            return response()->json(['error' => 'Error al crear la transferencia: '.$e->getMessage()], 500);
         }
     }
 
@@ -108,6 +124,10 @@ class TransferenciaController extends Controller
      */
     public function enviar(string $id): JsonResponse
     {
+        $t = TransferenciaAlmacen::findOrFail($id);
+        $this->authorizeAlmacen($t->almacen_origen_id);
+        $this->authorizeAlmacen($t->almacen_destino_id);
+
         try {
             return DB::transaction(function () use ($id) {
                 $transferencia = TransferenciaAlmacen::with('items.product')
@@ -142,13 +162,13 @@ class TransferenciaController extends Controller
 
                     // Movimiento de salida en origen
                     InventoryMovement::create([
-                        'product_id'  => $item->product_id,
-                        'almacen_id'  => $transferencia->almacen_origen_id,
-                        'user_id'     => auth()->id(),
-                        'type'        => 'out',
-                        'quantity'    => -$item->cantidad,
-                        'reference'   => 'TRANSF-' . $transferencia->id,
-                        'notes'       => 'Salida por transferencia a ' . ($transferencia->almacenDestino->nombre ?? ''),
+                        'product_id' => $item->product_id,
+                        'almacen_id' => $transferencia->almacen_origen_id,
+                        'user_id' => auth()->id(),
+                        'type' => 'out',
+                        'quantity' => -$item->cantidad,
+                        'reference' => 'TRANSF-'.$transferencia->id,
+                        'notes' => 'Salida por transferencia a '.($transferencia->almacenDestino->nombre ?? ''),
                     ]);
                 }
 
@@ -158,7 +178,8 @@ class TransferenciaController extends Controller
             });
         } catch (\Throwable $e) {
             report($e);
-            return response()->json(['error' => 'Error al enviar la transferencia: ' . $e->getMessage()], 500);
+
+            return response()->json(['error' => 'Error al enviar la transferencia: '.$e->getMessage()], 500);
         }
     }
 
@@ -169,10 +190,14 @@ class TransferenciaController extends Controller
     public function recibir(Request $request, string $id): JsonResponse
     {
         $validated = $request->validate([
-            'items'                         => 'nullable|array',
+            'items' => 'nullable|array',
             'items.*.transferencia_item_id' => 'required|integer',
-            'items.*.cantidad_recibida'     => 'required|integer|min:0',
+            'items.*.cantidad_recibida' => 'required|integer|min:0',
         ]);
+
+        $t = TransferenciaAlmacen::findOrFail($id);
+        $this->authorizeAlmacen($t->almacen_origen_id);
+        $this->authorizeAlmacen($t->almacen_destino_id);
 
         try {
             return DB::transaction(function () use ($id, $validated) {
@@ -212,27 +237,28 @@ class TransferenciaController extends Controller
 
                     // Movimiento de entrada en destino
                     InventoryMovement::create([
-                        'product_id'  => $item->product_id,
-                        'almacen_id'  => $transferencia->almacen_destino_id,
-                        'user_id'     => auth()->id(),
-                        'type'        => 'in',
-                        'quantity'    => $cantidadRecibida,
-                        'reference'   => 'TRANSF-' . $transferencia->id,
-                        'notes'       => 'Entrada por transferencia desde ' . ($transferencia->almacenOrigen->nombre ?? ''),
+                        'product_id' => $item->product_id,
+                        'almacen_id' => $transferencia->almacen_destino_id,
+                        'user_id' => auth()->id(),
+                        'type' => 'in',
+                        'quantity' => $cantidadRecibida,
+                        'reference' => 'TRANSF-'.$transferencia->id,
+                        'notes' => 'Entrada por transferencia desde '.($transferencia->almacenOrigen->nombre ?? ''),
                     ]);
                 }
 
                 $transferencia->update([
-                    'estado'          => 'recibida',
+                    'estado' => 'recibida',
                     'fecha_recepcion' => now(),
-                    'recibido_por'    => auth()->id(),
+                    'recibido_por' => auth()->id(),
                 ]);
 
                 return response()->json($transferencia->fresh()->load(['almacenOrigen', 'almacenDestino', 'items.product']));
             });
         } catch (\Throwable $e) {
             report($e);
-            return response()->json(['error' => 'Error al recibir la transferencia: ' . $e->getMessage()], 500);
+
+            return response()->json(['error' => 'Error al recibir la transferencia: '.$e->getMessage()], 500);
         }
     }
 
@@ -240,6 +266,9 @@ class TransferenciaController extends Controller
     public function destroy(string $id): JsonResponse
     {
         $transferencia = TransferenciaAlmacen::findOrFail($id);
+
+        $this->authorizeAlmacen($transferencia->almacen_origen_id);
+        $this->authorizeAlmacen($transferencia->almacen_destino_id);
 
         if ($transferencia->estado !== 'borrador') {
             return response()->json(['error' => 'Solo se pueden cancelar transferencias en estado borrador.'], 422);

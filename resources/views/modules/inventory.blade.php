@@ -3,7 +3,23 @@
 @section('page-title', 'Inventario')
 
 @section('content')
-<div id="inventory-app" class="relative">
+<div id="inventory-app" class="relative"
+    data-user-id="{{ auth()->id() }}"
+    data-is-admin="{{ auth()->user()->isAdmin() ? '1' : '0' }}">
+
+    <!-- Selector global de almacén activo -->
+    <div class="flex items-center gap-3 mb-5">
+        <div class="flex items-center gap-2 bg-white dark:bg-zinc-900 border border-slate-200/70 dark:border-zinc-800 rounded-xl px-3 py-2">
+            <svg class="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+            </svg>
+            <label for="almacen-selector" class="text-[11px] font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Almacén</label>
+            <select id="almacen-selector"
+                class="bg-transparent text-sm font-semibold text-slate-800 dark:text-zinc-100 focus:outline-none cursor-pointer pr-1">
+                <option value="">Cargando…</option>
+            </select>
+        </div>
+    </div>
 
     <!-- Stats Bar -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
@@ -513,6 +529,35 @@
                             class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-all">Guardar</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: PERMISOS DE ALMACÉN -->
+    <div id="permisos-modal" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 flex">
+        <div class="absolute inset-0 bg-slate-900/50 dark:bg-black/60 backdrop-blur-sm"></div>
+        <div class="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100 dark:border-zinc-800">
+            <div class="p-6 sm:p-8">
+                <div class="flex justify-between items-center mb-1">
+                    <h3 class="text-xl font-bold text-slate-800 dark:text-zinc-50">Permisos de acceso</h3>
+                    <button type="button" id="close-permisos-modal" class="text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300 transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <p id="permisos-almacen-nombre" class="text-sm text-slate-400 dark:text-zinc-500 mb-5">—</p>
+
+                <div class="flex gap-2 mb-5">
+                    <select id="permisos-add-select"
+                        class="flex-1 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 focus:bg-white dark:focus:bg-zinc-700 focus:border-emerald-500 focus:ring-emerald-500 transition-colors text-sm py-2 px-2">
+                        <option value="">Selecciona un usuario…</option>
+                    </select>
+                    <button type="button" id="permisos-add-btn"
+                        class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-semibold text-sm transition-all flex-shrink-0">Agregar</button>
+                </div>
+
+                <ul id="permisos-lista" class="space-y-2 max-h-72 overflow-y-auto">
+                    <li class="text-sm text-slate-400 dark:text-zinc-500">Cargando…</li>
+                </ul>
             </div>
         </div>
     </div>

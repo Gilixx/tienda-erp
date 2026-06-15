@@ -2,12 +2,13 @@
 
 namespace App\Http\Controllers\Api\Inventory;
 
+use App\Http\Controllers\Api\Inventory\Concerns\AuthorizesAlmacen;
 use App\Http\Controllers\Controller;
-use App\Models\InventoryMovement;
 use App\Models\Inventory\Almacen;
 use App\Models\Inventory\InventarioFisico;
 use App\Models\Inventory\InventarioFisicoItem;
 use App\Models\Inventory\ProductStock;
+use App\Models\InventoryMovement;
 use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,6 +16,8 @@ use Illuminate\Support\Facades\DB;
 
 class InventarioFisicoController extends Controller
 {
+    use AuthorizesAlmacen;
+
     /** GET /api/inventory/inventario-fisico */
     public function index(Request $request): JsonResponse
     {
@@ -22,7 +25,11 @@ class InventarioFisicoController extends Controller
             ->latest();
 
         if ($request->filled('almacen_id')) {
+            $this->authorizeAlmacen($request->integer('almacen_id'));
             $query->where('almacen_id', $request->integer('almacen_id'));
+        } else {
+            $accesibles = Almacen::accesiblesPara($request->user())->pluck('id');
+            $query->whereIn('almacen_id', $accesibles);
         }
         if ($request->filled('estado')) {
             $query->where('estado', $request->input('estado'));
@@ -42,6 +49,8 @@ class InventarioFisicoController extends Controller
             'items.contadoPor:id,name',
         ])->findOrFail($id);
 
+        $this->authorizeAlmacen($sesion->almacen_id);
+
         return response()->json($sesion);
     }
 
@@ -53,8 +62,10 @@ class InventarioFisicoController extends Controller
     {
         $validated = $request->validate([
             'almacen_id' => 'required|exists:almacenes,id',
-            'notas'      => 'nullable|string|max:1000',
+            'notas' => 'nullable|string|max:1000',
         ]);
+
+        $this->authorizeAlmacen($validated['almacen_id']);
 
         // No permitir dos sesiones abiertas para el mismo almacén
         $sesiónAbierta = InventarioFisico::where('almacen_id', $validated['almacen_id'])
@@ -70,11 +81,11 @@ class InventarioFisicoController extends Controller
         try {
             return DB::transaction(function () use ($validated) {
                 $sesion = InventarioFisico::create([
-                    'almacen_id'    => $validated['almacen_id'],
-                    'user_id'       => auth()->id(),
-                    'estado'        => 'abierto',
+                    'almacen_id' => $validated['almacen_id'],
+                    'user_id' => auth()->id(),
+                    'estado' => 'abierto',
                     'fecha_apertura' => now(),
-                    'notas'         => $validated['notas'] ?? null,
+                    'notas' => $validated['notas'] ?? null,
                 ]);
 
                 // Snapshot del stock actual del almacén
@@ -85,10 +96,10 @@ class InventarioFisicoController extends Controller
                 foreach ($stocks as $stockRow) {
                     InventarioFisicoItem::create([
                         'inventario_fisico_id' => $sesion->id,
-                        'product_id'           => $stockRow->product_id,
-                        'cantidad_teorica'     => $stockRow->cantidad,
-                        'cantidad_contada'     => null,
-                        'costo_unit'           => $stockRow->product->cost ?? 0,
+                        'product_id' => $stockRow->product_id,
+                        'cantidad_teorica' => $stockRow->cantidad,
+                        'cantidad_contada' => null,
+                        'costo_unit' => $stockRow->product->cost ?? 0,
                     ]);
                 }
 
@@ -99,7 +110,8 @@ class InventarioFisicoController extends Controller
             });
         } catch (\Throwable $e) {
             report($e);
-            return response()->json(['error' => 'Error al abrir la sesión: ' . $e->getMessage()], 500);
+
+            return response()->json(['error' => 'Error al abrir la sesión: '.$e->getMessage()], 500);
         }
     }
 
@@ -110,6 +122,8 @@ class InventarioFisicoController extends Controller
     public function registrarConteo(Request $request, string $id, string $itemId): JsonResponse
     {
         $sesion = InventarioFisico::findOrFail($id);
+
+        $this->authorizeAlmacen($sesion->almacen_id);
 
         if ($sesion->estado !== 'abierto') {
             return response()->json(['error' => 'Solo se puede registrar conteo en sesiones abiertas.'], 422);
@@ -124,8 +138,8 @@ class InventarioFisicoController extends Controller
 
         $item->update([
             'cantidad_contada' => $validated['cantidad_contada'],
-            'contado_por'      => auth()->id(),
-            'contado_en'       => now(),
+            'contado_por' => auth()->id(),
+            'contado_en' => now(),
         ]);
 
         return response()->json($item->fresh());
@@ -137,6 +151,8 @@ class InventarioFisicoController extends Controller
      */
     public function aplicar(string $id): JsonResponse
     {
+        $this->authorizeAlmacen(InventarioFisico::findOrFail($id)->almacen_id);
+
         try {
             return DB::transaction(function () use ($id) {
                 $sesion = InventarioFisico::with('items')->lockForUpdate()->findOrFail($id);
@@ -172,7 +188,7 @@ class InventarioFisicoController extends Controller
                         ProductStock::create([
                             'product_id' => $item->product_id,
                             'almacen_id' => $sesion->almacen_id,
-                            'cantidad'   => max(0, $diferencia),
+                            'cantidad' => max(0, $diferencia),
                         ]);
                     }
 
@@ -182,23 +198,23 @@ class InventarioFisicoController extends Controller
 
                     // Movimiento de ajuste
                     InventoryMovement::create([
-                        'product_id'  => $item->product_id,
-                        'almacen_id'  => $sesion->almacen_id,
-                        'user_id'     => auth()->id(),
-                        'type'        => 'adjustment',
-                        'quantity'    => $diferencia,
-                        'reference'   => 'INV-FISICO-' . $sesion->id,
-                        'notes'       => 'Ajuste por inventario físico. Teórico: ' . $item->cantidad_teorica . ', contado: ' . $contada,
+                        'product_id' => $item->product_id,
+                        'almacen_id' => $sesion->almacen_id,
+                        'user_id' => auth()->id(),
+                        'type' => 'adjustment',
+                        'quantity' => $diferencia,
+                        'reference' => 'INV-FISICO-'.$sesion->id,
+                        'notes' => 'Ajuste por inventario físico. Teórico: '.$item->cantidad_teorica.', contado: '.$contada,
                     ]);
 
                     $diferenciaTotal += abs($diferencia * (float) $item->costo_unit);
                 }
 
                 $sesion->update([
-                    'estado'                 => 'aplicado',
-                    'fecha_cierre'           => now(),
-                    'fecha_aplicacion'       => now(),
-                    'aplicado_por'           => auth()->id(),
+                    'estado' => 'aplicado',
+                    'fecha_cierre' => now(),
+                    'fecha_aplicacion' => now(),
+                    'aplicado_por' => auth()->id(),
                     'diferencia_total_valor' => round($diferenciaTotal, 4),
                 ]);
 
@@ -206,7 +222,8 @@ class InventarioFisicoController extends Controller
             });
         } catch (\Throwable $e) {
             report($e);
-            return response()->json(['error' => 'Error al aplicar el inventario: ' . $e->getMessage()], 500);
+
+            return response()->json(['error' => 'Error al aplicar el inventario: '.$e->getMessage()], 500);
         }
     }
 
@@ -214,6 +231,8 @@ class InventarioFisicoController extends Controller
     public function destroy(string $id): JsonResponse
     {
         $sesion = InventarioFisico::findOrFail($id);
+
+        $this->authorizeAlmacen($sesion->almacen_id);
 
         if ($sesion->estado === 'aplicado') {
             return response()->json(['error' => 'No se puede eliminar un inventario ya aplicado.'], 422);
