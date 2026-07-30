@@ -21,4 +21,10 @@ trait AuthorizesAlmacen
 
         return $almacen;
     }
+
+    /** IDs de los almacenes accesibles para el usuario actual, para filtrar listados. */
+    protected function accesibleAlmacenIds()
+    {
+        return Almacen::accesiblesPara(request()->user())->pluck('id');
+    }
 }

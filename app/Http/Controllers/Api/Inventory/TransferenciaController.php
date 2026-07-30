@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api\Inventory;
 
 use App\Http\Controllers\Api\Inventory\Concerns\AuthorizesAlmacen;
 use App\Http\Controllers\Controller;
-use App\Models\Inventory\Almacen;
 use App\Models\Inventory\ProductStock;
 use App\Models\Inventory\TransferenciaAlmacen;
 use App\Models\InventoryMovement;
@@ -20,17 +19,16 @@ class TransferenciaController extends Controller
     /** GET /api/inventory/transferencias */
     public function index(Request $request): JsonResponse
     {
-        $accesibles = Almacen::accesiblesPara($request->user())->pluck('id');
+        $accesibles = $this->accesibleAlmacenIds();
 
         $query = TransferenciaAlmacen::with([
             'almacenOrigen:id,nombre,codigo',
             'almacenDestino:id,nombre,codigo',
             'user:id,name',
         ])
-            // Solo transferencias que toquen un almacén accesible
-            ->where(fn ($q) => $q->whereIn('almacen_origen_id', $accesibles)
-                ->orWhereIn('almacen_destino_id', $accesibles)
-            )
+            // Solo transferencias cuyos dos almacenes sean accesibles (mismo criterio que show/enviar/recibir/destroy)
+            ->whereIn('almacen_origen_id', $accesibles)
+            ->whereIn('almacen_destino_id', $accesibles)
             ->latest('fecha')->latest('id');
 
         if ($request->filled('estado')) {
@@ -124,15 +122,14 @@ class TransferenciaController extends Controller
      */
     public function enviar(string $id): JsonResponse
     {
-        $t = TransferenciaAlmacen::findOrFail($id);
-        $this->authorizeAlmacen($t->almacen_origen_id);
-        $this->authorizeAlmacen($t->almacen_destino_id);
-
         try {
             return DB::transaction(function () use ($id) {
                 $transferencia = TransferenciaAlmacen::with('items.product')
                     ->lockForUpdate()
                     ->findOrFail($id);
+
+                $this->authorizeAlmacen($transferencia->almacen_origen_id);
+                $this->authorizeAlmacen($transferencia->almacen_destino_id);
 
                 if ($transferencia->estado !== 'borrador') {
                     return response()->json(['error' => 'Solo se pueden enviar transferencias en estado borrador.'], 422);
@@ -195,15 +192,14 @@ class TransferenciaController extends Controller
             'items.*.cantidad_recibida' => 'required|integer|min:0',
         ]);
 
-        $t = TransferenciaAlmacen::findOrFail($id);
-        $this->authorizeAlmacen($t->almacen_origen_id);
-        $this->authorizeAlmacen($t->almacen_destino_id);
-
         try {
             return DB::transaction(function () use ($id, $validated) {
                 $transferencia = TransferenciaAlmacen::with('items')
                     ->lockForUpdate()
                     ->findOrFail($id);
+
+                $this->authorizeAlmacen($transferencia->almacen_origen_id);
+                $this->authorizeAlmacen($transferencia->almacen_destino_id);
 
                 if ($transferencia->estado !== 'en_transito') {
                     return response()->json(['error' => 'Solo se pueden recibir transferencias en tránsito.'], 422);

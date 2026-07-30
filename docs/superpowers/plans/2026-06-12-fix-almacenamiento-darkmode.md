@@ -1,124 +1,64 @@
-import api from './api';
+# Fix Sistema de Almacenamiento + Modo Oscuro — Implementation Plan
 
-document.addEventListener('DOMContentLoaded', () => {
-    const app = document.getElementById('inventory-app');
-    if (!app) return;
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-    // ─── Auth (para permisos de almacén) ──────────────────────
-    const auth = {
-        id: parseInt(app.dataset.userId) || null,
-        isAdmin: app.dataset.isAdmin === '1',
-    };
+**Goal:** Reparar bugs visuales del modo oscuro y completar piezas faltantes del módulo de almacenamiento (almacenes, transferencias, inventario físico, alertas) en el ERP CRM-AC.
 
-    // ─── State ────────────────────────────────────────────────
-    const state = {
-        products: [],
-        categories: [],
-        movements: [],
-        selectedCategory: null,
-        searchQuery: '',
-        currentTab: 'products',
-        editingProductId: null,
-        selectedAlmacen: localStorage.getItem('inventory_almacen') || null,
-    };
+**Architecture:** Frontend vanilla-JS en `resources/js/inventory.js` que renderiza tablas y modales dentro de la Blade `resources/views/modules/inventory.blade.php`. No hay framework SPA. El modo oscuro se basa en clases `dark:` de Tailwind aplicadas vía el toggle `localStorage('theme')`. Los endpoints API en `routes/api.php` bajo `/api/inventory/*` ya existen — el plan agrega UI faltante y dark-mode classes a fragmentos JS-rendered.
 
-    // ─── DOM refs ─────────────────────────────────────────────
-    const productsTbody      = document.getElementById('products-tbody');
-    const movementsTbody     = document.getElementById('movements-tbody');
-    const loadingState       = document.getElementById('loading-state');
-    const categoriesContainer = document.getElementById('categories-container');
-    const searchInput        = document.getElementById('search-input');
-    const statLowStock       = document.getElementById('stat-low-stock');
-    const statTotalProducts  = document.getElementById('stat-total-products');
-    const statCategories     = document.getElementById('stat-categories');
+**Tech Stack:** Laravel 12, Blade, Tailwind CSS 4 (dark mode via `class`), Vite, vanilla JS, Axios via `api.js`. MySQL `CRMTEST`.
 
-    const addProductBtn      = document.getElementById('add-product-btn');
-    const addCategoryBtn     = document.getElementById('add-category-btn');
-    const tabProductsBtn     = document.getElementById('tab-products');
-    const tabMovementsBtn    = document.getElementById('tab-movements');
-    const productsSection    = document.getElementById('section-products');
-    const movementsSection   = document.getElementById('section-movements');
+---
 
-    // Product modal
-    const productModal       = document.getElementById('product-modal');
-    const productModalTitle  = document.getElementById('product-modal-title');
-    const closeProductModal  = document.getElementById('close-product-modal');
-    const cancelProductModal = document.getElementById('cancel-product-modal');
-    const productForm        = document.getElementById('product-form');
-    const categorySelect     = document.getElementById('product-category');
+## Resumen de problemas detectados
 
-    // Category modal
-    const categoryModal      = document.getElementById('category-modal');
-    const closeCategoryModal = document.getElementById('close-category-modal');
-    const cancelCategoryModal = document.getElementById('cancel-category-modal');
-    const categoryForm       = document.getElementById('category-form');
+### Modo oscuro (clases dark faltantes en fragmentos JS-rendered)
+1. `showConfirm` modal — fondo blanco fijo, texto invisible en oscuro
+2. `renderProducts` — filas, hover, badges Stock Bajo/Normal, texto SKU/precio/costo
+3. `renderMovements` — filas, badges tipo (Entrada/Salida/Ajuste), texto
+4. `renderAlmacenesGrid` — badge "Activo/Inactivo"
+5. `fetchAndRenderTransferencias` — badges de estado + filas hover
+6. `fetchAndRenderInvFisico` — badges de estado + filas hover
+7. `fetchAndRenderAlertas` — badge tipo + texto
+8. `importResult` (estados de resultado) — fondos sin dark
+9. Empty states (SVGs/textos vacíos en tablas)
+10. Tab "Alertas" pierde su color rose al activarse (queda emerald)
 
-    // Movement modal
-    const movementModal        = document.getElementById('movement-modal');
-    const closeMovementModal   = document.getElementById('close-movement-modal');
-    const cancelMovementModal  = document.getElementById('cancel-movement-modal');
-    const movementForm         = document.getElementById('movement-form');
-    const movementProductSelect = document.getElementById('movement-product');
-    const movementCurrentStock = document.getElementById('movement-current-stock');
-    const movementTypeSelect   = document.getElementById('movement-type');
-    const movementQtyLabel     = document.getElementById('movement-qty-label');
-    const movementQtyInput     = document.getElementById('movement-quantity');
-    const adjustmentHint       = document.getElementById('adjustment-hint');
+### Piezas funcionales faltantes
+11. Botón **"Nueva transferencia"** sin handler — no se puede crear
+12. **"Nuevo almacén"** usa `prompt()` nativo — sin descripción/dirección
+13. Sin editar/eliminar almacén desde UI
+14. Sin gestión de ubicaciones de almacén desde UI
+15. Sin vista detalle de transferencia / recibir con cantidades parciales
+16. Sin vista detalle de inventario físico / conteo manual de items
+17. **"Nueva sesión inv físico"** usa `prompt()` nativo
+18. Fecha de transferencia se muestra como ISO sin formatear
+19. `openImportModal` modifica `importResult.textContent` sin guard de null
 
-    const toastContainer = document.getElementById('toast-container');
+---
 
-    // ─── Security: HTML escape ─────────────────────────────────
-    function esc(str) {
-        if (str == null) return '';
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
-    }
+## File Structure
 
-    function fmt(num) {
-        return Number(num).toLocaleString('es-MX', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-        });
-    }
+**Modificar:**
+- `resources/js/inventory.js` — agregar handlers, modales nuevos, helpers dark mode, fix bugs
+- `resources/views/modules/inventory.blade.php` — agregar markup de nuevos modales (almacén, transferencia, conteo físico)
 
-    function formatDate(dateStr) {
-        if (!dateStr) return '—';
-        return new Date(dateStr).toLocaleString('es-MX', {
-            dateStyle: 'short',
-            timeStyle: 'short',
-        });
-    }
+**No se crean archivos nuevos.** Todo se mantiene en el módulo existente para preservar el patrón "un módulo = una Blade + un JS".
 
-    // ─── Toast notifications ───────────────────────────────────
-    function showToast(msg, type = 'success') {
-        const colors = {
-            success: 'bg-emerald-600',
-            error:   'bg-rose-600',
-            warning: 'bg-amber-500',
-        };
-        const icons = {
-            success: '<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>',
-            error:   '<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>',
-            warning: '<svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
-        };
+---
 
-        const el = document.createElement('div');
-        el.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl text-white shadow-lg text-sm font-medium transition-all duration-300 ${colors[type] || colors.success}`;
-        el.innerHTML = (icons[type] || icons.success) + `<span>${esc(msg)}</span>`;
-        toastContainer.appendChild(el);
+## Task 1: Helper dark-aware en inventory.js + Fix showConfirm
 
-        setTimeout(() => {
-            el.style.opacity = '0';
-            el.style.transform = 'translateX(110%)';
-            setTimeout(() => el.remove(), 300);
-        }, 3500);
-    }
+**Files:**
+- Modify: `resources/js/inventory.js:115-132` (función `showConfirm`)
 
-    // ─── Confirm dialog ────────────────────────────────────────
+**Why:** El modal de confirmación se renderiza vía JS con clases fijas que no respetan dark mode (fondo blanco, texto slate-700). Lo reescribimos con variantes `dark:`.
+
+- [ ] **Step 1: Reemplazar función `showConfirm`**
+
+Buscar la función actual (líneas ~115-132) y reemplazarla por:
+
+```javascript
     function showConfirm(message) {
         return new Promise(resolve => {
             const overlay = document.createElement('div');
@@ -137,142 +77,35 @@ document.addEventListener('DOMContentLoaded', () => {
             overlay.querySelector('#confirm-cancel').onclick = () => { overlay.remove(); resolve(false); };
         });
     }
+```
 
-    // ─── Init ──────────────────────────────────────────────────
-    async function init() {
-        showLoading();
-        try {
-            // Almacenes primero para resolver el almacén activo antes de pedir productos/movimientos
-            await Promise.all([fetchCategories(), fetchAlmacenes()]);
-            await Promise.all([fetchProducts(), fetchMovements()]);
-            renderStats();
-            renderCategories();
-            renderProducts();
-            renderMovements();
-            populateCategorySelects();
-            populateProductSelects();
-            // Cargar alertas en background para mostrar badge
-            fetchAndRenderAlertas().catch(() => {});
-        } catch (error) {
-            console.error('Error inicializando inventario', error);
-            showToast('Error al cargar los datos del inventario', 'error');
-        } finally {
-            hideLoading();
-        }
-    }
+Cambios clave: agrega `dark:bg-zinc-900`, `dark:text-zinc-200`, `dark:border-zinc-800` y todas las variantes para botones. Cambia botón "Eliminar" → "Confirmar" (más reutilizable). Añade `whitespace-pre-line` para que `\n` en mensajes funcione.
 
-    // ─── Fetches ───────────────────────────────────────────────
-    async function fetchProducts() {
-        const params = state.selectedAlmacen ? `?almacen_id=${state.selectedAlmacen}` : '';
-        const { data } = await api.get(`/api/inventory/products${params}`);
-        state.products = data;
-    }
+- [ ] **Step 2: Verificar visualmente**
 
-    async function fetchCategories() {
-        const { data } = await api.get('/api/inventory/categories');
-        state.categories = data;
-    }
+Abrir `/inventory`, alternar dark mode, intentar eliminar un producto. El modal debe verse legible en ambos temas.
 
-    async function fetchMovements() {
-        const params = state.selectedAlmacen ? `?almacen_id=${state.selectedAlmacen}` : '';
-        const { data } = await api.get(`/api/inventory/movements${params}`);
-        state.movements = data;
-    }
+- [ ] **Step 3: Commit**
 
-    // ─── Stats ─────────────────────────────────────────────────
-    function renderStats() {
-        const lowCount = state.products.filter(p => p.stock <= p.min_stock).length;
-        if (statTotalProducts) statTotalProducts.textContent = state.products.length;
-        if (statLowStock)      statLowStock.textContent = lowCount;
-        if (statCategories)    statCategories.textContent = state.categories.length;
-    }
+```bash
+git add resources/js/inventory.js
+git commit -m "fix(inventory): dark mode en modal showConfirm"
+```
 
-    // ─── Categories filter ─────────────────────────────────────
-    function renderCategories() {
-        if (!categoriesContainer) return;
+---
 
-        let html = `
-            <button class="category-btn flex-shrink-0 min-w-[100px] px-4 py-2.5 text-left rounded-xl border-2 transition-all text-sm
-                ${state.selectedCategory === null
-                    ? 'border-emerald-500 bg-emerald-50 text-emerald-700 font-semibold'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-emerald-200'}"
-                data-id="null">
-                Todas
-                <span class="block text-xs font-normal mt-0.5 opacity-70">${state.products.length}</span>
-            </button>`;
+## Task 2: Dark mode en renderProducts
 
-        html += state.categories.map(c => `
-            <div class="relative group flex-shrink-0">
-                <button class="category-btn min-w-[100px] px-4 py-2.5 text-left rounded-xl border-2 transition-all text-sm w-full
-                    ${state.selectedCategory == c.id
-                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-semibold'
-                        : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-200'}"
-                    data-id="${c.id}">
-                    <span class="pr-5 block truncate max-w-[120px]">${esc(c.name)}</span>
-                    <span class="block text-xs font-normal mt-0.5 opacity-70">${c.products_count || 0}</span>
-                </button>
-                <button class="btn-delete-category absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-50"
-                    data-id="${c.id}" data-name="${esc(c.name)}" title="Eliminar categoría">
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
-            </div>`).join('');
+**Files:**
+- Modify: `resources/js/inventory.js:262-303` (función `renderProducts`)
 
-        categoriesContainer.innerHTML = html;
+**Why:** Las filas de productos usan `text-slate-900`, `text-slate-500`, `border-slate-100`, `hover:bg-slate-50/60` y badges `bg-red-100 text-red-700` / `bg-emerald-100 text-emerald-700` sin variantes dark.
 
-        categoriesContainer.querySelectorAll('.category-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const id = btn.dataset.id;
-                state.selectedCategory = id === 'null' ? null : parseInt(id);
-                renderCategories();
-                renderProducts();
-            });
-        });
+- [ ] **Step 1: Actualizar empty state y badges de stock**
 
-        categoriesContainer.querySelectorAll('.btn-delete-category').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                const ok = await showConfirm(`¿Eliminar la categoría "${btn.dataset.name}"?\nLos productos asociados quedarán sin categoría.`);
-                if (!ok) return;
-                try {
-                    await api.delete(`/api/inventory/categories/${btn.dataset.id}`);
-                    const id = parseInt(btn.dataset.id);
-                    state.categories = state.categories.filter(c => c.id !== id);
-                    if (state.selectedCategory === id) state.selectedCategory = null;
-                    state.products = state.products.map(p =>
-                        p.category_id === id ? { ...p, category_id: null, category: null } : p
-                    );
-                    renderStats();
-                    renderCategories();
-                    renderProducts();
-                    populateCategorySelects();
-                    showToast('Categoría eliminada');
-                } catch (err) {
-                    showToast(err.response?.data?.message || 'Error al eliminar la categoría', 'error');
-                }
-            });
-        });
-    }
+Reemplazar la sección desde `if (list.length === 0)` hasta el cierre del `productsTbody.innerHTML = list.map(...)`:
 
-    // ─── Products table ────────────────────────────────────────
-    function getFilteredProducts() {
-        let products = state.products;
-        if (state.selectedCategory !== null) {
-            products = products.filter(p => p.category_id === state.selectedCategory);
-        }
-        if (state.searchQuery) {
-            const q = state.searchQuery.toLowerCase();
-            products = products.filter(p =>
-                p.name.toLowerCase().includes(q) ||
-                p.sku.toLowerCase().includes(q) ||
-                (p.category?.name || '').toLowerCase().includes(q)
-            );
-        }
-        return products;
-    }
-
-    function renderProducts() {
-        const list = getFilteredProducts();
-
+```javascript
         if (list.length === 0) {
             productsTbody.innerHTML = `
                 <tr><td colspan="8" class="px-6 py-12 text-center">
@@ -316,19 +149,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 </td>
             </tr>`;
         }).join('');
+```
 
-        productsTbody.querySelectorAll('.btn-edit').forEach(btn =>
-            btn.addEventListener('click', () => openEditProductModal(btn.dataset.id))
-        );
-        productsTbody.querySelectorAll('.btn-move').forEach(btn =>
-            btn.addEventListener('click', () => openMovementModal(btn.dataset.id))
-        );
-        productsTbody.querySelectorAll('.btn-delete').forEach(btn =>
-            btn.addEventListener('click', () => deleteProduct(btn.dataset.id))
-        );
-    }
+- [ ] **Step 2: Commit**
 
-    // ─── Movements table ───────────────────────────────────────
+```bash
+git add resources/js/inventory.js
+git commit -m "fix(inventory): dark mode en renderProducts (filas y badges)"
+```
+
+---
+
+## Task 3: Dark mode en renderMovements
+
+**Files:**
+- Modify: `resources/js/inventory.js:317-350` (función `renderMovements`)
+
+- [ ] **Step 1: Reemplazar la función completa**
+
+```javascript
     function renderMovements() {
         if (!movementsTbody) return;
 
@@ -363,280 +202,28 @@ document.addEventListener('DOMContentLoaded', () => {
             </tr>`;
         }).join('');
     }
+```
 
-    // ─── Populate selects ──────────────────────────────────────
-    function populateCategorySelects() {
-        if (!categorySelect) return;
-        categorySelect.innerHTML = '<option value="">Sin categoría</option>' +
-            state.categories.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
-    }
+- [ ] **Step 2: Commit**
 
-    function populateProductSelects() {
-        if (!movementProductSelect) return;
-        movementProductSelect.innerHTML = state.products.map(p =>
-            `<option value="${p.id}">${esc(p.name)} (${esc(p.sku)})</option>`
-        ).join('');
-    }
+```bash
+git add resources/js/inventory.js
+git commit -m "fix(inventory): dark mode en renderMovements"
+```
 
-    // ─── Delete product ────────────────────────────────────────
-    async function deleteProduct(id) {
-        const ok = await showConfirm('¿Seguro que deseas eliminar este producto?\nEsta acción no se puede deshacer.');
-        if (!ok) return;
-        try {
-            await api.delete(`/api/inventory/products/${id}`);
-            state.products = state.products.filter(p => p.id != id);
-            renderStats();
-            renderCategories();
-            renderProducts();
-            populateProductSelects();
-            showToast('Producto eliminado correctamente');
-        } catch (err) {
-            showToast(err.response?.data?.message || 'Error al eliminar el producto', 'error');
-        }
-    }
+---
 
-    // ─── Product modal ─────────────────────────────────────────
-    function openCreateProductModal() {
-        state.editingProductId = null;
-        productModalTitle.textContent = 'Registrar Producto';
-        productForm.reset();
-        showModal(productModal);
-    }
+## Task 4: Dark mode en renderAlmacenesGrid + acciones editar/eliminar
 
-    function openEditProductModal(id) {
-        const product = state.products.find(p => p.id == id);
-        if (!product) return;
-        state.editingProductId = id;
-        productModalTitle.textContent = 'Editar Producto';
-        productForm.querySelector('[name="name"]').value        = product.name;
-        productForm.querySelector('[name="sku"]').value         = product.sku;
-        productForm.querySelector('[name="category_id"]').value = product.category_id || '';
-        productForm.querySelector('[name="price"]').value       = product.price;
-        productForm.querySelector('[name="cost"]').value        = product.cost;
-        productForm.querySelector('[name="min_stock"]').value   = product.min_stock;
-        const descField = productForm.querySelector('[name="description"]');
-        if (descField) descField.value = product.description || '';
-        showModal(productModal);
-    }
+**Files:**
+- Modify: `resources/js/inventory.js:555-581` (función `renderAlmacenesGrid`)
+- Modify: `resources/js/inventory.js:583-596` (reemplazar handler `btn-nuevo-almacen`)
 
-    addProductBtn.addEventListener('click', openCreateProductModal);
-    [closeProductModal, cancelProductModal].forEach(el => el?.addEventListener('click', () => hideModal(productModal)));
+**Why:** Las tarjetas de almacén son legibles en dark pero el badge "Activo/Inactivo" no tiene dark. Además, no hay botones para editar/eliminar/ver ubicaciones.
 
-    productForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const data = Object.fromEntries(new FormData(productForm));
-        if (!data.category_id) delete data.category_id;
+- [ ] **Step 1: Reemplazar `renderAlmacenesGrid`**
 
-        const isEditing = !!state.editingProductId;
-        const submitBtn = productForm.querySelector('[type="submit"]');
-        submitBtn.disabled = true;
-
-        try {
-            let res;
-            if (isEditing) {
-                res = await api.put(`/api/inventory/products/${state.editingProductId}`, data);
-                const idx = state.products.findIndex(p => p.id == state.editingProductId);
-                if (idx !== -1) state.products[idx] = res.data;
-            } else {
-                res = await api.post('/api/inventory/products', data);
-                state.products.unshift(res.data);
-                if (data.category_id) {
-                    const cat = state.categories.find(c => c.id == data.category_id);
-                    if (cat) cat.products_count = (cat.products_count || 0) + 1;
-                }
-            }
-            renderStats();
-            renderCategories();
-            renderProducts();
-            populateProductSelects();
-            hideModal(productModal);
-            showToast(isEditing ? 'Producto actualizado correctamente' : 'Producto registrado con éxito');
-        } catch (err) {
-            const errors = err.response?.data?.errors;
-            const msg = errors
-                ? Object.values(errors).flat().join(' ')
-                : (err.response?.data?.message || 'Error al guardar el producto');
-            showToast(msg, 'error');
-        } finally {
-            submitBtn.disabled = false;
-        }
-    });
-
-    // ─── Category modal ────────────────────────────────────────
-    addCategoryBtn.addEventListener('click', () => {
-        categoryForm.reset();
-        showModal(categoryModal);
-    });
-    [closeCategoryModal, cancelCategoryModal].forEach(el => el?.addEventListener('click', () => hideModal(categoryModal)));
-
-    categoryForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const data = Object.fromEntries(new FormData(categoryForm));
-        const submitBtn = categoryForm.querySelector('[type="submit"]');
-        submitBtn.disabled = true;
-
-        try {
-            const res = await api.post('/api/inventory/categories', data);
-            res.data.products_count = 0;
-            state.categories.push(res.data);
-            renderStats();
-            renderCategories();
-            populateCategorySelects();
-            hideModal(categoryModal);
-            showToast('Categoría creada con éxito');
-        } catch (err) {
-            const msg = err.response?.data?.message || 'Error al guardar la categoría';
-            showToast(msg, 'error');
-        } finally {
-            submitBtn.disabled = false;
-        }
-    });
-
-    // ─── Movement modal ────────────────────────────────────────
-    function openMovementModal(productId) {
-        movementForm.reset();
-        if (movementProductSelect) movementProductSelect.value = productId;
-        const movementAlmacenSel = document.getElementById('movement-almacen');
-        if (movementAlmacenSel && state.selectedAlmacen) movementAlmacenSel.value = state.selectedAlmacen;
-        syncMovementStockDisplay();
-        syncMovementTypeUI();
-        showModal(movementModal);
-    }
-
-    [closeMovementModal, cancelMovementModal].forEach(el => el?.addEventListener('click', () => hideModal(movementModal)));
-
-    async function syncMovementStockDisplay() {
-        if (!movementProductSelect || !movementCurrentStock) return;
-        const productId = movementProductSelect.value;
-        if (!productId) { movementCurrentStock.textContent = '—'; return; }
-
-        const almacenSel = document.getElementById('movement-almacen');
-        const almacenId = almacenSel ? almacenSel.value : state.selectedAlmacen;
-
-        // Si el almacén elegido en el modal es el activo, ya tenemos su stock en memoria
-        if (!almacenId || String(almacenId) === String(state.selectedAlmacen)) {
-            const product = state.products.find(p => p.id == productId);
-            movementCurrentStock.textContent = product != null ? product.stock : '—';
-            return;
-        }
-
-        // El usuario eligió otro almacén dentro del modal: consultar su stock específico
-        try {
-            const { data } = await api.get(`/api/inventory/products?almacen_id=${almacenId}`);
-            const product = data.find(p => p.id == productId);
-            movementCurrentStock.textContent = product != null ? product.stock : '—';
-        } catch (err) {
-            movementCurrentStock.textContent = '—';
-        }
-    }
-
-    function syncMovementTypeUI() {
-        if (!movementTypeSelect || !movementQtyLabel || !movementQtyInput || !adjustmentHint) return;
-        const isAdj = movementTypeSelect.value === 'adjustment';
-        movementQtyLabel.textContent = isAdj ? 'Cantidad de ajuste' : 'Cantidad';
-        movementQtyInput.min         = isAdj ? '-999999' : '1';
-        movementQtyInput.placeholder = isAdj ? 'Ej: -5 ó +10' : '';
-        adjustmentHint.classList.toggle('hidden', !isAdj);
-    }
-
-    if (movementProductSelect) movementProductSelect.addEventListener('change', syncMovementStockDisplay);
-    if (movementTypeSelect)    movementTypeSelect.addEventListener('change', syncMovementTypeUI);
-    const movementAlmacenSelect = document.getElementById('movement-almacen');
-    if (movementAlmacenSelect) movementAlmacenSelect.addEventListener('change', syncMovementStockDisplay);
-
-    movementForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const data = Object.fromEntries(new FormData(movementForm));
-        const submitBtn = movementForm.querySelector('[type="submit"]');
-        submitBtn.disabled = true;
-
-        try {
-            const res = await api.post('/api/inventory/movements', data);
-            // Solo insertarlo directo si pertenece al almacén activo; si no, refrescar desde el servidor
-            if (!state.selectedAlmacen || String(res.data.almacen_id) === String(state.selectedAlmacen)) {
-                state.movements.unshift(res.data);
-            } else {
-                await fetchMovements();
-            }
-            // Refrescar stock por almacén activo (el response no incluye el stock por almacén)
-            await fetchProducts();
-            renderStats();
-            renderProducts();
-            renderMovements();
-            populateProductSelects();
-            hideModal(movementModal);
-            showToast('Movimiento registrado correctamente');
-        } catch (err) {
-            const msg = err.response?.data?.error || err.response?.data?.message || 'Error al registrar el movimiento';
-            showToast(msg, 'error');
-        } finally {
-            submitBtn.disabled = false;
-        }
-    });
-
-    // ─── Almacenes ─────────────────────────────────────────────
-    let almacenes = [];
-
-    async function fetchAlmacenes() {
-        const { data } = await api.get('/api/inventory/almacenes');
-        almacenes = data;
-
-        // Resolver almacén activo: el guardado si sigue accesible, si no el Principal o el primero
-        const ids = almacenes.map(a => String(a.id));
-        if (!state.selectedAlmacen || !ids.includes(String(state.selectedAlmacen))) {
-            const principal = almacenes.find(a => a.es_principal) || almacenes[0];
-            state.selectedAlmacen = principal ? String(principal.id) : null;
-            if (state.selectedAlmacen) localStorage.setItem('inventory_almacen', state.selectedAlmacen);
-        }
-
-        populateAlmacenSelects();
-        populateGlobalAlmacenSelector();
-    }
-
-    function populateAlmacenSelects() {
-        const sel = document.getElementById('movement-almacen');
-        if (sel) {
-            sel.innerHTML = almacenes.map(a =>
-                `<option value="${a.id}">${esc(a.nombre)} (${esc(a.codigo)})</option>`
-            ).join('');
-            if (state.selectedAlmacen) sel.value = state.selectedAlmacen;
-        }
-    }
-
-    // ── Selector global de almacén activo ──
-    const globalAlmacenSelector = document.getElementById('almacen-selector');
-
-    function populateGlobalAlmacenSelector() {
-        if (!globalAlmacenSelector) return;
-        if (!almacenes.length) {
-            globalAlmacenSelector.innerHTML = '<option value="">Sin almacenes</option>';
-            return;
-        }
-        globalAlmacenSelector.innerHTML = almacenes.map(a =>
-            `<option value="${a.id}">${esc(a.nombre)} (${esc(a.codigo)})${a.es_principal ? ' ★' : ''}</option>`
-        ).join('');
-        if (state.selectedAlmacen) globalAlmacenSelector.value = state.selectedAlmacen;
-    }
-
-    globalAlmacenSelector?.addEventListener('change', async () => {
-        state.selectedAlmacen = globalAlmacenSelector.value || null;
-        if (state.selectedAlmacen) localStorage.setItem('inventory_almacen', state.selectedAlmacen);
-        else localStorage.removeItem('inventory_almacen');
-
-        // Sincronizar selects dependientes y recargar datos del almacén activo
-        populateAlmacenSelects();
-        try {
-            await Promise.all([fetchProducts(), fetchMovements()]);
-            renderStats();
-            renderCategories();
-            renderProducts();
-            renderMovements();
-            fetchAndRenderAlertas().catch(() => {});
-        } catch (err) {
-            showToast('Error al cambiar de almacén', 'error');
-        }
-    });
-
+```javascript
     function renderAlmacenesGrid() {
         const grid = document.getElementById('almacenes-grid');
         if (!grid) return;
@@ -666,13 +253,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     ${a.es_principal ? '<span class="text-amber-600 dark:text-amber-400 font-semibold">Principal</span>' : ''}
                 </div>
                 <div class="flex gap-2 mt-3">
-                    ${a.puede_gestionar ? `<button class="btn-editar-almacen flex-1 text-xs px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 font-medium transition-colors" data-id="${a.id}">
+                    <button class="btn-editar-almacen flex-1 text-xs px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 font-medium transition-colors" data-id="${a.id}">
                         Editar
-                    </button>` : ''}
-                    ${a.puede_gestionar ? `<button class="btn-permisos-almacen flex-1 text-xs px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40 font-medium transition-colors" data-id="${a.id}" data-nombre="${esc(a.nombre)}">
-                        Permisos
-                    </button>` : ''}
-                    ${(a.puede_gestionar && !a.es_principal) ? `<button class="btn-eliminar-almacen flex-1 text-xs px-3 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40 font-medium transition-colors" data-id="${a.id}" data-nombre="${esc(a.nombre)}">
+                    </button>
+                    ${!a.es_principal ? `<button class="btn-eliminar-almacen flex-1 text-xs px-3 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40 font-medium transition-colors" data-id="${a.id}" data-nombre="${esc(a.nombre)}">
                         Eliminar
                     </button>` : ''}
                 </div>
@@ -683,9 +267,6 @@ document.addEventListener('DOMContentLoaded', () => {
         );
         grid.querySelectorAll('.btn-eliminar-almacen').forEach(btn =>
             btn.addEventListener('click', () => eliminarAlmacen(parseInt(btn.dataset.id), btn.dataset.nombre))
-        );
-        grid.querySelectorAll('.btn-permisos-almacen').forEach(btn =>
-            btn.addEventListener('click', () => openPermisosModal(parseInt(btn.dataset.id), btn.dataset.nombre))
         );
     }
 
@@ -701,7 +282,90 @@ document.addEventListener('DOMContentLoaded', () => {
             showToast(err.response?.data?.error || 'Error al eliminar el almacén', 'error');
         }
     }
+```
 
+- [ ] **Step 2: Commit**
+
+```bash
+git add resources/js/inventory.js
+git commit -m "feat(inventory): tarjetas de almacén con dark mode + acciones editar/eliminar"
+```
+
+---
+
+## Task 5: Modal de crear/editar almacén (reemplazo de prompt)
+
+**Files:**
+- Modify: `resources/views/modules/inventory.blade.php` (agregar markup del modal antes del cierre `</div>` de `#inventory-app`)
+- Modify: `resources/js/inventory.js:583-596` (reemplazar handler `btn-nuevo-almacen`)
+
+**Why:** El handler actual usa `prompt()` nativo dos veces. UX horrible, no funciona en móviles bien, no permite editar descripción/dirección.
+
+- [ ] **Step 1: Agregar markup del modal en la Blade**
+
+En `resources/views/modules/inventory.blade.php`, **antes del cierre `</div>` que cierra `#inventory-app`** (línea ~474), agregar:
+
+```blade
+    <!-- MODAL: ALMACÉN (crear/editar) -->
+    <div id="almacen-modal" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 flex">
+        <div class="absolute inset-0 bg-slate-900/50 dark:bg-black/60 backdrop-blur-sm"></div>
+        <div class="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100 dark:border-zinc-800">
+            <div class="p-6 sm:p-8">
+                <div class="flex justify-between items-center mb-5">
+                    <h3 id="almacen-modal-title" class="text-xl font-bold text-slate-800 dark:text-zinc-50">Nuevo Almacén</h3>
+                    <button type="button" id="close-almacen-modal" class="text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300 transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                @php $inpA = 'w-full rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 focus:bg-white dark:focus:bg-zinc-700 focus:border-emerald-500 focus:ring-emerald-500 transition-colors text-sm placeholder-slate-400 dark:placeholder-zinc-500'; @endphp
+                <form id="almacen-form" class="space-y-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Nombre <span class="text-rose-500">*</span></label>
+                            <input type="text" name="nombre" required maxlength="100" class="{{ $inpA }}">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Código <span class="text-rose-500">*</span></label>
+                            <input type="text" name="codigo" required maxlength="20" placeholder="Ej: BODEGA-A" class="{{ $inpA }}">
+                        </div>
+                        <div class="col-span-2">
+                            <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Descripción</label>
+                            <textarea name="descripcion" rows="2" maxlength="500" class="{{ $inpA }}"></textarea>
+                        </div>
+                        <div class="col-span-2">
+                            <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Dirección</label>
+                            <input type="text" name="direccion" maxlength="500" class="{{ $inpA }}">
+                        </div>
+                        <div class="col-span-2 flex items-center gap-2">
+                            <input type="checkbox" name="activo" id="almacen-activo" checked class="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500">
+                            <label for="almacen-activo" class="text-sm text-slate-700 dark:text-zinc-300">Almacén activo</label>
+                        </div>
+                    </div>
+                    <div class="pt-2 flex justify-end gap-3">
+                        <button type="button" id="cancel-almacen-modal"
+                            class="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800 font-medium text-sm transition-colors">Cancelar</button>
+                        <button type="submit"
+                            class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-all">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+```
+
+- [ ] **Step 2: Reemplazar handler de `btn-nuevo-almacen` en `inventory.js`**
+
+Buscar el bloque actual:
+```javascript
+    document.getElementById('btn-nuevo-almacen')?.addEventListener('click', async () => {
+        const nombre = prompt('Nombre del almacén:');
+        ...
+    });
+```
+
+Reemplazarlo con:
+
+```javascript
     // ── Modal de almacén (crear/editar) ──
     let editingAlmacenId = null;
     const almacenModal      = document.getElementById('almacen-modal');
@@ -760,92 +424,27 @@ document.addEventListener('DOMContentLoaded', () => {
             submitBtn.disabled = false;
         }
     });
+```
 
-    // ── Modal de permisos de almacén ──
-    const permisosModal      = document.getElementById('permisos-modal');
-    const permisosNombre     = document.getElementById('permisos-almacen-nombre');
-    const permisosLista      = document.getElementById('permisos-lista');
-    const permisosAddSelect  = document.getElementById('permisos-add-select');
-    const permisosAddBtn     = document.getElementById('permisos-add-btn');
-    const closePermisosBtn   = document.getElementById('close-permisos-modal');
-    let permisosAlmacenId = null;
+- [ ] **Step 3: Commit**
 
-    async function openPermisosModal(id, nombre) {
-        permisosAlmacenId = id;
-        permisosNombre.textContent = nombre;
-        permisosLista.innerHTML = '<li class="text-sm text-slate-400 dark:text-zinc-500">Cargando…</li>';
-        permisosAddSelect.innerHTML = '<option value="">Selecciona un usuario…</option>';
-        showModal(permisosModal);
-        await Promise.all([cargarPermisosLista(), cargarPermisosDisponibles()]);
-    }
+```bash
+git add resources/views/modules/inventory.blade.php resources/js/inventory.js
+git commit -m "feat(inventory): modal de crear/editar almacén (reemplaza prompt nativo)"
+```
 
-    async function cargarPermisosLista() {
-        try {
-            const { data } = await api.get(`/api/inventory/almacenes/${permisosAlmacenId}/usuarios`);
-            if (!data.length) {
-                permisosLista.innerHTML = '<li class="text-sm text-slate-400 dark:text-zinc-500">Sin usuarios.</li>';
-                return;
-            }
-            permisosLista.innerHTML = data.map(u => `
-                <li class="flex items-center justify-between gap-3 bg-slate-50 dark:bg-zinc-800/60 rounded-xl px-3 py-2">
-                    <div class="min-w-0">
-                        <p class="text-sm font-medium text-slate-800 dark:text-zinc-100 truncate">${esc(u.name)}${u.es_creador ? ' <span class="text-[10px] font-bold text-amber-600 dark:text-amber-400">DUEÑO</span>' : ''}</p>
-                        <p class="text-xs text-slate-400 dark:text-zinc-500 truncate">${esc(u.email)}</p>
-                    </div>
-                    ${u.es_creador ? '' : `<button class="btn-quitar-permiso text-xs text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 font-semibold flex-shrink-0" data-id="${u.id}">Quitar</button>`}
-                </li>`).join('');
+---
 
-            permisosLista.querySelectorAll('.btn-quitar-permiso').forEach(btn =>
-                btn.addEventListener('click', () => quitarPermiso(parseInt(btn.dataset.id)))
-            );
-        } catch (err) {
-            permisosLista.innerHTML = '<li class="text-sm text-rose-500">Error al cargar.</li>';
-        }
-    }
+## Task 6: Dark mode en fetchAndRenderTransferencias + fix fecha
 
-    async function cargarPermisosDisponibles() {
-        try {
-            const { data } = await api.get(`/api/inventory/almacenes/${permisosAlmacenId}/usuarios-disponibles`);
-            permisosAddSelect.innerHTML = '<option value="">Selecciona un usuario…</option>' +
-                data.map(u => `<option value="${u.id}">${esc(u.name)} — ${esc(u.email)}</option>`).join('');
-        } catch (err) {
-            // silencioso
-        }
-    }
+**Files:**
+- Modify: `resources/js/inventory.js:599-633` (función `fetchAndRenderTransferencias`)
 
-    permisosAddBtn?.addEventListener('click', async () => {
-        const userId = permisosAddSelect.value;
-        if (!userId) return;
-        permisosAddBtn.disabled = true;
-        try {
-            await api.post(`/api/inventory/almacenes/${permisosAlmacenId}/usuarios`, { user_id: parseInt(userId) });
-            showToast('Acceso concedido.');
-            await Promise.all([cargarPermisosLista(), cargarPermisosDisponibles()]);
-        } catch (err) {
-            showToast(err.response?.data?.error || 'Error al conceder acceso', 'error');
-        } finally {
-            permisosAddBtn.disabled = false;
-        }
-    });
+**Why:** Badges sin dark, hover sin dark, y la fecha se imprime como string ISO crudo (`2026-06-12`) sin formatear.
 
-    async function quitarPermiso(userId) {
-        const ok = await showConfirm('¿Revocar el acceso de este usuario al almacén?');
-        if (!ok) return;
-        try {
-            await api.delete(`/api/inventory/almacenes/${permisosAlmacenId}/usuarios/${userId}`);
-            showToast('Acceso revocado.');
-            await Promise.all([cargarPermisosLista(), cargarPermisosDisponibles()]);
-        } catch (err) {
-            showToast(err.response?.data?.error || 'Error al revocar acceso', 'error');
-        }
-    }
+- [ ] **Step 1: Reemplazar la función**
 
-    closePermisosBtn?.addEventListener('click', () => hideModal(permisosModal));
-    permisosModal?.addEventListener('click', (e) => {
-        if (e.target === permisosModal || e.target.classList.contains('absolute')) hideModal(permisosModal);
-    });
-
-    // ─── Transferencias ────────────────────────────────────────
+```javascript
     async function fetchAndRenderTransferencias() {
         try {
             const { data } = await api.get('/api/inventory/transferencias');
@@ -923,7 +522,91 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     }
+```
 
+Y **eliminar** los handlers globales `window._enviarTransferencia` y `window._recibirTransferencia` (líneas ~635-659) — ya no son necesarios.
+
+- [ ] **Step 2: Commit**
+
+```bash
+git add resources/js/inventory.js
+git commit -m "fix(inventory): dark mode + formato fecha + handlers internos en transferencias"
+```
+
+---
+
+## Task 7: Modal de creación de transferencia
+
+**Files:**
+- Modify: `resources/views/modules/inventory.blade.php` (agregar markup del modal)
+- Modify: `resources/js/inventory.js` (agregar handler `btn-nueva-transferencia` y submit)
+
+**Why:** El botón "Nueva transferencia" existe en HTML pero **no tiene handler**. Sin esto, el usuario no puede crear transferencias desde la UI.
+
+- [ ] **Step 1: Agregar markup del modal en la Blade**
+
+Antes del cierre `</div>` de `#inventory-app`, agregar:
+
+```blade
+    <!-- MODAL: TRANSFERENCIA (crear) -->
+    <div id="transferencia-modal" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 flex">
+        <div class="absolute inset-0 bg-slate-900/50 dark:bg-black/60 backdrop-blur-sm"></div>
+        <div class="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden border border-slate-100 dark:border-zinc-800 flex flex-col">
+            <div class="p-6 sm:p-8 overflow-y-auto">
+                <div class="flex justify-between items-center mb-5">
+                    <h3 class="text-xl font-bold text-slate-800 dark:text-zinc-50">Nueva Transferencia</h3>
+                    <button type="button" id="close-transferencia-modal" class="text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300 transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                @php $inpT = 'w-full rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 focus:bg-white dark:focus:bg-zinc-700 focus:border-emerald-500 focus:ring-emerald-500 transition-colors text-sm'; @endphp
+                <form id="transferencia-form" class="space-y-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Almacén origen <span class="text-rose-500">*</span></label>
+                            <select name="almacen_origen_id" id="transf-origen" required class="{{ $inpT }}"></select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Almacén destino <span class="text-rose-500">*</span></label>
+                            <select name="almacen_destino_id" id="transf-destino" required class="{{ $inpT }}"></select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Fecha <span class="text-rose-500">*</span></label>
+                            <input type="date" name="fecha" id="transf-fecha" required class="{{ $inpT }}">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Referencia</label>
+                            <input type="text" name="referencia" maxlength="100" placeholder="Opcional" class="{{ $inpT }}">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-2">Productos a transferir</label>
+                        <div id="transf-items" class="space-y-2 border border-slate-200 dark:border-zinc-700 rounded-xl p-3 max-h-60 overflow-y-auto bg-slate-50/50 dark:bg-zinc-800/50">
+                            <!-- JS rendered -->
+                        </div>
+                        <button type="button" id="transf-add-item" class="mt-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300">+ Agregar producto</button>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Notas</label>
+                        <textarea name="notas" rows="2" maxlength="1000" class="{{ $inpT }}"></textarea>
+                    </div>
+                    <div class="pt-2 flex justify-end gap-3">
+                        <button type="button" id="cancel-transferencia-modal"
+                            class="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800 font-medium text-sm transition-colors">Cancelar</button>
+                        <button type="submit"
+                            class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-all">Crear transferencia</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+```
+
+- [ ] **Step 2: Agregar lógica en `inventory.js`**
+
+Dentro del `DOMContentLoaded`, **antes de la línea `// ─── Inventario Físico ─`**, agregar:
+
+```javascript
     // ── Modal de crear transferencia ──
     const transferenciaModal     = document.getElementById('transferencia-modal');
     const transferenciaForm      = document.getElementById('transferencia-form');
@@ -935,41 +618,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const cancelTransferenciaBtn = document.getElementById('cancel-transferencia-modal');
     const addTransfItemBtn       = document.getElementById('transf-add-item');
 
-    // Stock de productos según el almacén de origen elegido en el modal (no siempre es el activo)
-    let transfProducts = state.products;
-
-    function transfProductOptions() {
-        return transfProducts.map(p => `<option value="${p.id}">${esc(p.name)} (${esc(p.sku)}) — stock ${p.stock}</option>`).join('');
-    }
-
-    async function refreshTransfProducts() {
-        const almacenId = transfOrigen.value;
-        if (!almacenId || String(almacenId) === String(state.selectedAlmacen)) {
-            transfProducts = state.products;
-        } else {
-            try {
-                const { data } = await api.get(`/api/inventory/products?almacen_id=${almacenId}`);
-                transfProducts = data;
-            } catch (err) {
-                transfProducts = [];
-            }
-        }
-        // Refrescar el stock mostrado en las filas ya agregadas, conservando la selección
-        transfItemsContainer.querySelectorAll('.transf-item-product').forEach(sel => {
-            const current = sel.value;
-            sel.innerHTML = transfProductOptions();
-            if (current) sel.value = current;
-        });
-    }
-
-    transfOrigen?.addEventListener('change', refreshTransfProducts);
-
     function renderTransfItemRow() {
         const row = document.createElement('div');
         row.className = 'flex gap-2 items-center transf-item-row';
         row.innerHTML = `
             <select class="transf-item-product flex-1 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 text-sm focus:border-emerald-500 focus:ring-emerald-500 py-2 px-2">
-                ${transfProductOptions()}
+                ${state.products.map(p => `<option value="${p.id}">${esc(p.name)} (${esc(p.sku)}) — stock ${p.stock}</option>`).join('')}
             </select>
             <input type="number" min="1" class="transf-item-qty w-24 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 text-sm focus:border-emerald-500 focus:ring-emerald-500 py-2 px-2" placeholder="Cant." required value="1">
             <button type="button" class="transf-item-remove text-rose-500 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300 p-1">
@@ -979,20 +633,15 @@ document.addEventListener('DOMContentLoaded', () => {
         transfItemsContainer.appendChild(row);
     }
 
-    async function openTransferenciaModal() {
+    function openTransferenciaModal() {
         transferenciaForm.reset();
         // Llenar selects de almacenes (filtra solo activos)
         const opts = almacenes.filter(a => a.activo).map(a => `<option value="${a.id}">${esc(a.nombre)} (${esc(a.codigo)})</option>`).join('');
         transfOrigen.innerHTML  = opts;
         transfDestino.innerHTML = opts;
-        // Origen por defecto: el almacén activo
-        if (state.selectedAlmacen) transfOrigen.value = state.selectedAlmacen;
-        // Destino: el primero distinto al origen
-        const destino = almacenes.find(a => a.activo && String(a.id) !== String(transfOrigen.value));
-        if (destino) transfDestino.value = destino.id;
+        if (almacenes.length >= 2) transfDestino.value = almacenes[1].id;
         transfFecha.value = new Date().toISOString().slice(0, 10);
         transfItemsContainer.innerHTML = '';
-        await refreshTransfProducts();
         renderTransfItemRow();
         showModal(transferenciaModal);
     }
@@ -1055,7 +704,109 @@ document.addEventListener('DOMContentLoaded', () => {
             submitBtn.disabled = false;
         }
     });
+```
 
+- [ ] **Step 3: Commit**
+
+```bash
+git add resources/views/modules/inventory.blade.php resources/js/inventory.js
+git commit -m "feat(inventory): modal de creación de transferencias"
+```
+
+---
+
+## Task 8: Dark mode y conteo manual en inventario físico
+
+**Files:**
+- Modify: `resources/views/modules/inventory.blade.php` (agregar modal de sesión + modal de detalle)
+- Modify: `resources/js/inventory.js:662-715` (mejorar `fetchAndRenderInvFisico` y handler de nueva sesión)
+
+**Why:** El handler de "Nueva sesión" usa `prompt()`. Y aplicar sin conteos manuales no ajusta nada (todo queda igual al teórico). Necesitamos modal de selección y vista de detalle para registrar conteos por item.
+
+- [ ] **Step 1: Agregar markup de modal de nueva sesión + modal de detalle/conteo**
+
+Antes del cierre `</div>` de `#inventory-app`, agregar:
+
+```blade
+    <!-- MODAL: NUEVA SESIÓN INVENTARIO FÍSICO -->
+    <div id="invfisico-modal" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 flex">
+        <div class="absolute inset-0 bg-slate-900/50 dark:bg-black/60 backdrop-blur-sm"></div>
+        <div class="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 dark:border-zinc-800">
+            <div class="p-6 sm:p-8">
+                <div class="flex justify-between items-center mb-5">
+                    <h3 class="text-xl font-bold text-slate-800 dark:text-zinc-50">Nueva Sesión de Inventario</h3>
+                    <button type="button" id="close-invfisico-modal" class="text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300 transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                @php $inpI = 'w-full rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 focus:bg-white dark:focus:bg-zinc-700 focus:border-emerald-500 focus:ring-emerald-500 transition-colors text-sm'; @endphp
+                <form id="invfisico-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Almacén <span class="text-rose-500">*</span></label>
+                        <select name="almacen_id" id="invfisico-almacen" required class="{{ $inpI }}"></select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Notas</label>
+                        <textarea name="notas" rows="2" maxlength="1000" class="{{ $inpI }}"></textarea>
+                    </div>
+                    <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/40 rounded-xl p-3 text-xs text-amber-800 dark:text-amber-300">
+                        Al abrir la sesión se tomará un snapshot del stock actual. Luego registrarás el conteo físico de cada producto.
+                    </div>
+                    <div class="pt-2 flex justify-end gap-3">
+                        <button type="button" id="cancel-invfisico-modal"
+                            class="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800 font-medium text-sm transition-colors">Cancelar</button>
+                        <button type="submit"
+                            class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-all">Abrir sesión</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: DETALLE INVENTARIO FÍSICO (conteo) -->
+    <div id="invfisico-detalle-modal" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 flex">
+        <div class="absolute inset-0 bg-slate-900/50 dark:bg-black/60 backdrop-blur-sm"></div>
+        <div class="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden border border-slate-100 dark:border-zinc-800 flex flex-col">
+            <div class="p-6 sm:p-8 overflow-y-auto">
+                <div class="flex justify-between items-center mb-5">
+                    <div>
+                        <h3 class="text-xl font-bold text-slate-800 dark:text-zinc-50">Conteo Físico</h3>
+                        <p id="invfisico-detalle-info" class="text-xs text-slate-500 dark:text-zinc-400 mt-1"></p>
+                    </div>
+                    <button type="button" id="close-invfisico-detalle" class="text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300 transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <div class="overflow-x-auto border border-slate-200 dark:border-zinc-800 rounded-xl">
+                    <table class="w-full text-sm">
+                        <thead class="bg-slate-50 dark:bg-zinc-800/60">
+                            <tr class="text-[11px] font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">
+                                <th class="px-4 py-2 text-left">SKU</th>
+                                <th class="px-4 py-2 text-left">Producto</th>
+                                <th class="px-4 py-2 text-center">Teórico</th>
+                                <th class="px-4 py-2 text-center">Contado</th>
+                                <th class="px-4 py-2 text-center">Diferencia</th>
+                            </tr>
+                        </thead>
+                        <tbody id="invfisico-detalle-tbody" class="divide-y divide-slate-100 dark:divide-zinc-800"></tbody>
+                    </table>
+                </div>
+                <div class="pt-4 flex justify-end gap-3">
+                    <button type="button" id="cancel-invfisico-detalle"
+                        class="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800 font-medium text-sm transition-colors">Cerrar</button>
+                    <button type="button" id="btn-aplicar-invfisico"
+                        class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-all">Aplicar ajustes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+```
+
+- [ ] **Step 2: Reescribir lógica de inventario físico en `inventory.js`**
+
+Reemplazar el bloque desde `// ─── Inventario Físico ─` hasta antes de `// ─── Alertas de Stock ─` con:
+
+```javascript
     // ─── Inventario Físico ─────────────────────────────────────
     async function fetchAndRenderInvFisico() {
         try {
@@ -1121,7 +872,6 @@ document.addEventListener('DOMContentLoaded', () => {
         invFisicoForm.reset();
         invFisicoAlmacen.innerHTML = almacenes.filter(a => a.activo)
             .map(a => `<option value="${a.id}">${esc(a.nombre)} (${esc(a.codigo)})</option>`).join('');
-        if (state.selectedAlmacen) invFisicoAlmacen.value = state.selectedAlmacen;
         showModal(invFisicoModal);
     });
 
@@ -1236,11 +986,34 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // ─── Alertas de Stock ──────────────────────────────────────
+    // (Quitar el viejo window._aplicarInvFisico — ya no se usa)
+```
+
+Y **eliminar** el `window._aplicarInvFisico` y el viejo handler de `btn-nueva-sesion-inv` (línea ~702).
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add resources/views/modules/inventory.blade.php resources/js/inventory.js
+git commit -m "feat(inventory): conteo manual de inventario físico + dark mode + modal de sesión"
+```
+
+---
+
+## Task 9: Dark mode en alertas + fix de tab activo
+
+**Files:**
+- Modify: `resources/js/inventory.js:718-749` (función `fetchAndRenderAlertas`)
+- Modify: `resources/js/inventory.js:780-803` (función `switchTab`)
+
+**Why:** Alertas no tienen dark mode. Y el tab "Alertas" pierde su color rose al estar activo porque `switchTab` lo pinta de emerald universalmente.
+
+- [ ] **Step 1: Actualizar `fetchAndRenderAlertas`**
+
+```javascript
     async function fetchAndRenderAlertas() {
         try {
-            const params = state.selectedAlmacen ? `?almacen_id=${state.selectedAlmacen}` : '';
-            const { data } = await api.get(`/api/inventory/alertas${params}`);
+            const { data } = await api.get('/api/inventory/alertas');
             const tbody  = document.getElementById('tbody-alertas');
             const count  = document.getElementById('alertas-count');
             const badge  = document.getElementById('alertas-badge');
@@ -1284,26 +1057,15 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         } catch (err) { console.error(err); }
     }
+```
 
-    // ─── Tabs (actualizado con nuevos tabs) ────────────────────
-    const allSections = {
-        products:      document.getElementById('section-products'),
-        movements:     document.getElementById('section-movements'),
-        almacenes:     document.getElementById('section-almacenes'),
-        transferencias: document.getElementById('section-transferencias'),
-        'inv-fisico':  document.getElementById('section-inv-fisico'),
-        alertas:       document.getElementById('section-alertas'),
-    };
+Y **eliminar** el `window._resolverAlerta` (línea ~752).
 
-    const allTabBtns = {
-        products:      tabProductsBtn,
-        movements:     tabMovementsBtn,
-        almacenes:     document.getElementById('tab-almacenes'),
-        transferencias: document.getElementById('tab-transferencias'),
-        'inv-fisico':  document.getElementById('tab-inv-fisico'),
-        alertas:       document.getElementById('tab-alertas'),
-    };
+- [ ] **Step 2: Arreglar `switchTab` para que respete el color del tab Alertas**
 
+Reemplazar la función `switchTab`:
+
+```javascript
     function switchTab(tab) {
         state.currentTab = tab;
 
@@ -1346,59 +1108,32 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tab === 'inv-fisico') fetchAndRenderInvFisico();
         if (tab === 'alertas') fetchAndRenderAlertas();
     }
+```
 
-    Object.entries(allTabBtns).forEach(([key, btn]) => {
-        btn?.addEventListener('click', () => switchTab(key));
-    });
+- [ ] **Step 3: Commit**
 
-    // ─── Search ────────────────────────────────────────────────
-    searchInput?.addEventListener('input', (e) => {
-        state.searchQuery = e.target.value.trim();
-        renderProducts();
-    });
+```bash
+git add resources/js/inventory.js
+git commit -m "fix(inventory): dark mode en alertas + tab Alertas conserva color rose al activarse"
+```
 
-    // ─── Modal helpers ─────────────────────────────────────────
-    function showModal(modal) {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-    }
+---
 
-    function hideModal(modal) {
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-    }
+## Task 10: Fix de bugs lógicos menores
 
-    // Close modal on backdrop click
-    [productModal, movementModal, categoryModal].forEach(modal => {
-        modal?.addEventListener('click', (e) => {
-            if (e.target === modal || e.target.classList.contains('absolute')) {
-                hideModal(modal);
-            }
-        });
-    });
+**Files:**
+- Modify: `resources/js/inventory.js:857-865` (función `openImportModal`)
+- Modify: `resources/js/inventory.js:899-902` (clases de estado de `importResult`)
 
-    // ─── Loading ───────────────────────────────────────────────
-    function showLoading() {
-        loadingState?.classList.remove('hidden');
-        productsTbody?.classList.add('hidden');
-    }
+**Why:**
+1. `openImportModal` hace `importResult.textContent = ''` sin guard — si `importResult` es null crashea.
+2. Las clases CSS para los estados de éxito/error/warning en `importResult` no tienen dark mode.
 
-    function hideLoading() {
-        loadingState?.classList.add('hidden');
-        productsTbody?.classList.remove('hidden');
-    }
+- [ ] **Step 1: Guards y dark mode en import**
 
-    // ─── Importar CSV ──────────────────────────────────────────
-    const importBtn          = document.getElementById('import-products-btn');
-    const importModal        = document.getElementById('import-modal');
-    const closeImportModal   = document.getElementById('close-import-modal');
-    const cancelImportModal  = document.getElementById('cancel-import-modal');
-    const importForm         = document.getElementById('import-form');
-    const importFileInput    = document.getElementById('import-file');
-    const importResult       = document.getElementById('import-result');
-    const importSubmitBtn    = document.getElementById('import-submit-btn');
-    const downloadTemplateBtn = document.getElementById('download-template-btn');
+Reemplazar:
 
+```javascript
     function openImportModal() {
         importForm?.reset();
         if (importResult) {
@@ -1407,74 +1142,107 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         importModal?.classList.remove('hidden');
     }
-    function closeImport() {
-        importModal?.classList.add('hidden');
-    }
+```
 
-    importBtn?.addEventListener('click', openImportModal);
-    closeImportModal?.addEventListener('click', closeImport);
-    cancelImportModal?.addEventListener('click', closeImport);
-    importModal?.addEventListener('click', (e) => { if (e.target === importModal.firstElementChild) closeImport(); });
+Y dentro del `importForm.addEventListener('submit', ...)`, cuando se asigna `importResult.className`, reemplazar las clases:
 
-    downloadTemplateBtn?.addEventListener('click', () => {
-        window.location.href = '/api/inventory/products-template';
-    });
-
-    importForm?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const file = importFileInput?.files?.[0];
-        if (!file) return;
-
-        if (file.size > 5 * 1024 * 1024) {
-            showToast('Archivo excede 5 MB', 'error');
-            return;
-        }
-
-        const fd = new FormData();
-        fd.append('file', file);
-
-        importSubmitBtn.disabled = true;
-        importSubmitBtn.textContent = 'Importando…';
-        importResult.classList.add('hidden');
-
-        try {
-            const { data } = await api.post('/api/inventory/products-import', fd);
-
-            const msg = `Creados: ${data.created} · Actualizados: ${data.updated}` +
-                        (data.error_count ? ` · Errores: ${data.error_count}` : '');
-            importResult.textContent = msg;
+```javascript
             importResult.className = 'text-sm rounded-xl p-3 ' +
                 (data.error_count
                     ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 border border-amber-100 dark:border-amber-800/40'
                     : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-800/40');
-            importResult.classList.remove('hidden');
+```
 
-            if (data.errors && data.errors.length) {
-                const details = document.createElement('details');
-                details.className = 'mt-2 text-xs';
-                details.innerHTML = `<summary class="cursor-pointer">Ver errores</summary><ul class="list-disc list-inside mt-1">${data.errors.map(e => `<li>${e.replace(/</g,'&lt;')}</li>`).join('')}</ul>`;
-                importResult.appendChild(details);
-            }
+Y el catch:
 
-            showToast('Importación completada');
-            await Promise.all([fetchCategories(), fetchProducts()]);
-            renderStats();
-            renderCategories();
-            renderProducts();
-            populateCategorySelects();
-            populateProductSelects();
-        } catch (err) {
-            const msg = err.response?.data?.message || 'Error al importar';
-            importResult.textContent = msg;
+```javascript
             importResult.className = 'text-sm rounded-xl p-3 bg-rose-50 dark:bg-rose-900/20 text-rose-800 dark:text-rose-300 border border-rose-100 dark:border-rose-800/40';
-            importResult.classList.remove('hidden');
-            showToast(msg, 'error');
-        } finally {
-            importSubmitBtn.disabled = false;
-            importSubmitBtn.textContent = 'Importar';
-        }
-    });
+```
 
-    // ─── Start ─────────────────────────────────────────────────
-    init();
-});
+- [ ] **Step 2: Commit**
+
+```bash
+git add resources/js/inventory.js
+git commit -m "fix(inventory): guards en openImportModal + dark mode en resultado de importación"
+```
+
+---
+
+## Task 11: Build + verificación visual final
+
+**Files:** (sin cambios, solo verificación)
+
+- [ ] **Step 1: Construir assets**
+
+```bash
+npm run build
+```
+
+Expected: build success, sin errores de Vite.
+
+- [ ] **Step 2: Levantar dev server (si no está corriendo)**
+
+```bash
+php artisan serve
+```
+
+- [ ] **Step 3: Checklist visual manual en `/inventory`**
+
+Abrir el módulo Inventario en navegador y comprobar en **light mode** y **dark mode**:
+
+- [ ] Tabla de productos: filas, badges Stock Bajo/Normal, hover, botones de acción
+- [ ] Tabla de movimientos: badges Entrada/Salida/Ajuste, hover
+- [ ] Modal de confirmación al eliminar producto: legible en ambos temas
+- [ ] Tab Almacenes:
+  - [ ] Tarjetas con badge Activo/Inactivo
+  - [ ] Botón "Nuevo almacén" abre modal (no prompt)
+  - [ ] Botón Editar abre modal pre-llenado
+  - [ ] Botón Eliminar pide confirmación
+- [ ] Tab Transferencias:
+  - [ ] Botón "Nueva transferencia" abre modal
+  - [ ] Crear transferencia con varios productos
+  - [ ] Botones Enviar/Recibir/Cancelar funcionan
+  - [ ] Fecha se muestra formateada (ej: "12 jun 2026")
+- [ ] Tab Inventario Físico:
+  - [ ] Botón "Nueva sesión" abre modal (no prompt)
+  - [ ] Botón "Contar" abre modal de detalle con tabla editable
+  - [ ] Conteos se guardan al perder foco del input
+  - [ ] Diferencia se actualiza en tiempo real
+  - [ ] Botón "Aplicar ajustes" funciona
+- [ ] Tab Alertas:
+  - [ ] Tab activo mantiene color rose (no emerald)
+  - [ ] Filas y badges legibles en dark mode
+  - [ ] Botón "Resolver" funciona
+- [ ] Importación CSV: estados de éxito/error/warning legibles en dark
+
+- [ ] **Step 4: Commit final (si hubo ajustes)**
+
+```bash
+git add -A
+git commit -m "chore(inventory): verificación visual final post-refactor"
+```
+
+---
+
+## Self-review
+
+**Cobertura de problemas detectados:**
+- ✅ Dark mode en `showConfirm` → Task 1
+- ✅ Dark mode en `renderProducts` → Task 2
+- ✅ Dark mode en `renderMovements` → Task 3
+- ✅ Dark mode en `renderAlmacenesGrid` + acciones editar/eliminar → Task 4
+- ✅ Modal de crear/editar almacén → Task 5
+- ✅ Dark mode + fecha en transferencias → Task 6
+- ✅ Modal de crear transferencia (handler faltante) → Task 7
+- ✅ Conteo manual de inventario físico → Task 8
+- ✅ Dark mode en alertas + fix tab activo → Task 9
+- ✅ Bugs menores de import → Task 10
+- ✅ Verificación visual → Task 11
+
+**Notas para el ejecutor:**
+- No tocar los endpoints API — ya están completos y funcionando.
+- Mantener el patrón vanilla-JS existente; no introducir librerías.
+- Las clases Tailwind ya usadas en el proyecto siguen el patrón `bg-X-100 dark:bg-X-900/30 text-X-700 dark:text-X-400` — respétalo para coherencia.
+- Después de cada task, **hacer build con `npm run build`** si modificaste JS, ya que Vite necesita re-bundlear.
+- Trabajar directamente en `main` (preferencia del usuario, ver memoria `feedback_work_on_main`).
+- Hacer un commit por task — no batch.

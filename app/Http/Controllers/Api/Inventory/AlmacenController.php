@@ -6,7 +6,6 @@ use App\Http\Controllers\Api\Inventory\Concerns\AuthorizesAlmacen;
 use App\Http\Controllers\Controller;
 use App\Models\Inventory\Almacen;
 use App\Models\Inventory\AlmacenUbicacion;
-use App\Models\Service;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -157,21 +156,15 @@ class AlmacenController extends Controller
             $excluidos[] = $almacen->created_by;
         }
 
-        $service = Service::where('key', 'inventory')->first();
-
-        $query = User::query()
+        // Solo usuarios con acceso vigente al módulo (admins o con el servicio inventory sin expirar)
+        $usuarios = User::query()
             ->whereNotIn('id', $excluidos)
-            ->orderBy('name');
+            ->orderBy('name')
+            ->get(['id', 'name', 'email'])
+            ->filter(fn (User $u) => $u->hasService('inventory'))
+            ->values();
 
-        // Solo usuarios con acceso al módulo (admins o con el servicio inventory)
-        if ($service) {
-            $query->where(function ($q) use ($service) {
-                $q->where('role', 'admin')
-                    ->orWhereHas('services', fn ($s) => $s->where('services.id', $service->id));
-            });
-        }
-
-        return response()->json($query->get(['id', 'name', 'email']));
+        return response()->json($usuarios);
     }
 
     /** POST /api/inventory/almacenes/{id}/usuarios */
@@ -186,6 +179,11 @@ class AlmacenController extends Controller
 
         if ($validated['user_id'] == $almacen->created_by) {
             return response()->json(['error' => 'El dueño ya tiene acceso al almacén.'], 422);
+        }
+
+        $target = User::findOrFail($validated['user_id']);
+        if (! $target->hasService('inventory')) {
+            return response()->json(['error' => 'El usuario no tiene acceso al módulo de inventario.'], 422);
         }
 
         $almacen->usuariosConAcceso()->syncWithoutDetaching([
@@ -222,6 +220,7 @@ class AlmacenController extends Controller
     public function storeUbicacion(Request $request, string $id): JsonResponse
     {
         $almacen = $this->authorizeAlmacen($id);
+        $this->authorizeGestion($almacen, $request);
 
         $validated = $request->validate([
             'codigo' => 'required|string|max:30',
@@ -243,9 +242,10 @@ class AlmacenController extends Controller
     }
 
     /** DELETE /api/inventory/almacenes/{almacenId}/ubicaciones/{ubicacionId} */
-    public function destroyUbicacion(string $almacenId, string $ubicacionId): JsonResponse
+    public function destroyUbicacion(Request $request, string $almacenId, string $ubicacionId): JsonResponse
     {
-        $this->authorizeAlmacen($almacenId);
+        $almacen = $this->authorizeAlmacen($almacenId);
+        $this->authorizeGestion($almacen, $request);
 
         $ubicacion = AlmacenUbicacion::where('almacen_id', $almacenId)
             ->findOrFail($ubicacionId);

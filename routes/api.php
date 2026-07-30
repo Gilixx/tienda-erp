@@ -144,8 +144,16 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
             return response()->json($query->paginate(min(100, $r->integer('per_page', 50))));
         });
 
-        Route::patch('/alertas/{id}/resolver', function (string $id) {
+        Route::patch('/alertas/{id}/resolver', function (\Illuminate\Http\Request $r, string $id) {
             $alerta = \App\Models\Inventory\AlertaStock::findOrFail($id);
+
+            if ($alerta->almacen_id) {
+                abort_unless(
+                    \App\Models\Inventory\Almacen::findOrFail($alerta->almacen_id)->accesiblePara($r->user()),
+                    403, 'No tienes acceso a este almacén.'
+                );
+            }
+
             $alerta->update(['estado' => 'resuelta']);
 
             return response()->json(['message' => 'Alerta resuelta.']);

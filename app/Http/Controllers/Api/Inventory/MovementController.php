@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api\Inventory;
 
 use App\Http\Controllers\Api\Inventory\Concerns\AuthorizesAlmacen;
 use App\Http\Controllers\Controller;
-use App\Models\Inventory\Almacen;
 use App\Models\Inventory\ProductStock;
 use App\Models\InventoryMovement;
 use App\Models\Product;
@@ -28,8 +27,7 @@ class MovementController extends Controller
             $query->where('almacen_id', $request->integer('almacen_id'));
         } else {
             // Limitar a almacenes accesibles para el usuario
-            $accesibles = Almacen::accesiblesPara($request->user())->pluck('id');
-            $query->whereIn('almacen_id', $accesibles);
+            $query->whereIn('almacen_id', $this->accesibleAlmacenIds());
         }
         if ($request->filled('product_id')) {
             $query->where('product_id', $request->integer('product_id'));

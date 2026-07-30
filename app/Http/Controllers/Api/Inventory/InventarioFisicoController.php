@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api\Inventory;
 
 use App\Http\Controllers\Api\Inventory\Concerns\AuthorizesAlmacen;
 use App\Http\Controllers\Controller;
-use App\Models\Inventory\Almacen;
 use App\Models\Inventory\InventarioFisico;
 use App\Models\Inventory\InventarioFisicoItem;
 use App\Models\Inventory\ProductStock;
@@ -28,8 +27,7 @@ class InventarioFisicoController extends Controller
             $this->authorizeAlmacen($request->integer('almacen_id'));
             $query->where('almacen_id', $request->integer('almacen_id'));
         } else {
-            $accesibles = Almacen::accesiblesPara($request->user())->pluck('id');
-            $query->whereIn('almacen_id', $accesibles);
+            $query->whereIn('almacen_id', $this->accesibleAlmacenIds());
         }
         if ($request->filled('estado')) {
             $query->where('estado', $request->input('estado'));
@@ -151,11 +149,11 @@ class InventarioFisicoController extends Controller
      */
     public function aplicar(string $id): JsonResponse
     {
-        $this->authorizeAlmacen(InventarioFisico::findOrFail($id)->almacen_id);
-
         try {
             return DB::transaction(function () use ($id) {
                 $sesion = InventarioFisico::with('items')->lockForUpdate()->findOrFail($id);
+
+                $this->authorizeAlmacen($sesion->almacen_id);
 
                 if ($sesion->estado === 'aplicado') {
                     return response()->json(['error' => 'Esta sesión ya fue aplicada.'], 422);
