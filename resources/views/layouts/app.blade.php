@@ -78,31 +78,20 @@
                 </svg>
                 Inventario
             </a>
-
-            <a href="{{ route('inventory.stats') }}" onclick="closeSidebar()"
-               class="flex items-center gap-3 py-2 pr-3 rounded-lg text-sm font-medium transition-colors
-               {{ request()->routeIs('inventory.stats')
-                    ? 'bg-violet-50 dark:bg-violet-900/25 text-violet-700 dark:text-violet-400 border-l-[3px] border-violet-600 dark:border-violet-500 pl-[9px]'
-                    : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800 hover:text-slate-800 dark:hover:text-zinc-100 border-l-[3px] border-transparent pl-[9px]' }}">
-                <svg class="h-[18px] w-[18px] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-                Estadísticas IA
-            </a>
             @endif
 
-            @if(auth()->user()->hasService('finance'))
-            <p class="px-3 pt-4 pb-2 text-[10px] font-semibold text-slate-400 dark:text-zinc-600 uppercase tracking-widest">Finanzas</p>
+            @if(auth()->user()->hasService('pos'))
+            <p class="px-3 pt-4 pb-2 text-[10px] font-semibold text-slate-400 dark:text-zinc-600 uppercase tracking-widest">Ventas</p>
 
-            <a href="{{ route('finance') }}" onclick="closeSidebar()"
+            <a href="{{ route('pos') }}" onclick="closeSidebar()"
                class="flex items-center gap-3 py-2 pr-3 rounded-lg text-sm font-medium transition-colors
-               {{ request()->routeIs('finance')
-                    ? 'bg-amber-50 dark:bg-amber-900/25 text-amber-700 dark:text-amber-400 border-l-[3px] border-amber-600 dark:border-amber-500 pl-[9px]'
+               {{ request()->routeIs('pos')
+                    ? 'bg-indigo-50 dark:bg-indigo-900/25 text-indigo-700 dark:text-indigo-400 border-l-[3px] border-indigo-600 dark:border-indigo-500 pl-[9px]'
                     : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800 hover:text-slate-800 dark:hover:text-zinc-100 border-l-[3px] border-transparent pl-[9px]' }}">
                 <svg class="h-[18px] w-[18px] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
-                Finanzas
+                Punto de Venta
             </a>
             @endif
 

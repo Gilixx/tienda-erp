@@ -575,7 +575,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ─── Almacenes ─────────────────────────────────────────────
-    let almacenes = [];
+    let almacenes = [];       // solo activos — para selectores operativos
+    let almacenesAll = [];    // activos + inactivos — para la gestión en la pestaña Almacenes
 
     async function fetchAlmacenes() {
         const { data } = await api.get('/api/inventory/almacenes');
@@ -637,16 +638,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    function renderAlmacenesGrid() {
+    async function fetchAlmacenesAll() {
+        try {
+            const { data } = await api.get('/api/inventory/almacenes', { activos: 0 });
+            almacenesAll = data;
+        } catch (err) {
+            almacenesAll = [];
+        }
+    }
+
+    async function renderAlmacenesGrid() {
         const grid = document.getElementById('almacenes-grid');
         if (!grid) return;
 
-        if (!almacenes.length) {
+        // La gestión incluye almacenes inactivos (para poder reactivarlos).
+        await fetchAlmacenesAll();
+
+        if (!almacenesAll.length) {
             grid.innerHTML = '<p class="text-slate-400 dark:text-zinc-500 text-sm col-span-3">No hay almacenes registrados.</p>';
             return;
         }
 
-        grid.innerHTML = almacenes.map(a => `
+        grid.innerHTML = almacenesAll.map(a => `
             <div class="bg-white dark:bg-zinc-900 border border-slate-200/70 dark:border-zinc-800 border-l-[3px] ${a.es_principal ? 'border-l-amber-500' : 'border-l-emerald-500'} rounded-2xl p-5">
                 <div class="flex items-start justify-between mb-3">
                     <div class="min-w-0">
@@ -665,14 +678,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span>${a.total_productos ?? 0} SKUs con stock</span>
                     ${a.es_principal ? '<span class="text-amber-600 dark:text-amber-400 font-semibold">Principal</span>' : ''}
                 </div>
-                <div class="flex gap-2 mt-3">
-                    ${a.puede_gestionar ? `<button class="btn-editar-almacen flex-1 text-xs px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 font-medium transition-colors" data-id="${a.id}">
+                <div class="flex flex-wrap gap-2 mt-3">
+                    ${a.puede_gestionar ? `<button class="btn-editar-almacen flex-1 min-w-[72px] text-xs px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 font-medium transition-colors" data-id="${a.id}">
                         Editar
                     </button>` : ''}
-                    ${a.puede_gestionar ? `<button class="btn-permisos-almacen flex-1 text-xs px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40 font-medium transition-colors" data-id="${a.id}" data-nombre="${esc(a.nombre)}">
+                    ${(a.puede_gestionar && (!a.es_principal || !a.activo)) ? `<button class="btn-toggle-almacen flex-1 min-w-[72px] text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${a.activo
+                        ? 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:bg-slate-200 dark:hover:bg-zinc-700'
+                        : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40'}" data-id="${a.id}" data-activo="${a.activo ? 1 : 0}">
+                        ${a.activo ? 'Desactivar' : 'Activar'}
+                    </button>` : ''}
+                    ${a.puede_gestionar ? `<button class="btn-permisos-almacen flex-1 min-w-[72px] text-xs px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40 font-medium transition-colors" data-id="${a.id}" data-nombre="${esc(a.nombre)}">
                         Permisos
                     </button>` : ''}
-                    ${(a.puede_gestionar && !a.es_principal) ? `<button class="btn-eliminar-almacen flex-1 text-xs px-3 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40 font-medium transition-colors" data-id="${a.id}" data-nombre="${esc(a.nombre)}">
+                    ${(a.puede_gestionar && !a.es_principal) ? `<button class="btn-eliminar-almacen flex-1 min-w-[72px] text-xs px-3 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40 font-medium transition-colors" data-id="${a.id}" data-nombre="${esc(a.nombre)}">
                         Eliminar
                     </button>` : ''}
                 </div>
@@ -681,12 +699,27 @@ document.addEventListener('DOMContentLoaded', () => {
         grid.querySelectorAll('.btn-editar-almacen').forEach(btn =>
             btn.addEventListener('click', () => openAlmacenModal(parseInt(btn.dataset.id)))
         );
+        grid.querySelectorAll('.btn-toggle-almacen').forEach(btn =>
+            btn.addEventListener('click', () => toggleAlmacenActivo(parseInt(btn.dataset.id), btn.dataset.activo === '1'))
+        );
         grid.querySelectorAll('.btn-eliminar-almacen').forEach(btn =>
             btn.addEventListener('click', () => eliminarAlmacen(parseInt(btn.dataset.id), btn.dataset.nombre))
         );
         grid.querySelectorAll('.btn-permisos-almacen').forEach(btn =>
             btn.addEventListener('click', () => openPermisosModal(parseInt(btn.dataset.id), btn.dataset.nombre))
         );
+    }
+
+    async function toggleAlmacenActivo(id, isActive) {
+        try {
+            await api.put(`/api/inventory/almacenes/${id}`, { activo: !isActive });
+            // Refresca selectores operativos (solo activos) y el grid (incluye inactivos).
+            await fetchAlmacenes();
+            await renderAlmacenesGrid();
+            showToast(isActive ? 'Almacén desactivado' : 'Almacén activado');
+        } catch (err) {
+            showToast(err.response?.data?.error || 'Error al actualizar el almacén', 'error');
+        }
     }
 
     async function eliminarAlmacen(id, nombre) {
@@ -714,7 +747,7 @@ document.addEventListener('DOMContentLoaded', () => {
         editingAlmacenId = id;
         almacenForm.reset();
         if (id) {
-            const a = almacenes.find(x => x.id === id);
+            const a = almacenesAll.find(x => x.id === id) || almacenes.find(x => x.id === id);
             if (!a) return;
             almacenModalTitle.textContent = 'Editar Almacén';
             almacenForm.querySelector('[name="nombre"]').value      = a.nombre;
@@ -1056,186 +1089,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // ─── Inventario Físico ─────────────────────────────────────
-    async function fetchAndRenderInvFisico() {
-        try {
-            const { data } = await api.get('/api/inventory/inventario-fisico');
-            const tbody = document.getElementById('tbody-inv-fisico');
-            if (!tbody) return;
-            const items = data.data ?? data;
-            if (!items.length) {
-                tbody.innerHTML = '<tr><td colspan="7" class="px-5 py-6 text-center text-slate-400 dark:text-zinc-500">No hay sesiones de inventario.</td></tr>';
-                return;
-            }
-            const estadoMap = {
-                abierto:  { label: 'Abierto',  cls: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400' },
-                cerrado:  { label: 'Cerrado',  cls: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400' },
-                aplicado: { label: 'Aplicado', cls: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' },
-            };
-            tbody.innerHTML = items.map(s => {
-                const est = estadoMap[s.estado] ?? { label: s.estado, cls: 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300' };
-                return `<tr class="border-b border-slate-100 dark:border-zinc-800 hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition-colors">
-                    <td class="px-5 py-3.5 text-sm font-medium text-slate-800 dark:text-zinc-100">${esc(s.almacen?.nombre ?? '—')}</td>
-                    <td class="px-5 py-3.5 text-sm text-slate-500 dark:text-zinc-400">${formatDate(s.fecha_apertura)}</td>
-                    <td class="px-5 py-3.5 text-sm text-slate-500 dark:text-zinc-400">${s.fecha_cierre ? formatDate(s.fecha_cierre) : '—'}</td>
-                    <td class="px-5 py-3.5 text-right font-mono text-sm text-slate-700 dark:text-zinc-200">${s.diferencia_total_valor != null ? '$' + fmt(s.diferencia_total_valor) : '—'}</td>
-                    <td class="px-5 py-3.5"><span class="text-xs font-semibold px-2 py-0.5 rounded-full ${est.cls}">${est.label}</span></td>
-                    <td class="px-5 py-3.5 text-sm text-slate-500 dark:text-zinc-400">${esc(s.user?.name ?? '—')}</td>
-                    <td class="px-5 py-3.5 text-right whitespace-nowrap">
-                        ${s.estado === 'abierto' ? `<button data-action="contar" data-id="${s.id}" class="btn-invfisico-action text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded-lg transition-colors">Contar</button>` : ''}
-                        ${s.estado !== 'aplicado' ? `<button data-action="eliminar" data-id="${s.id}" class="btn-invfisico-action ml-1 text-xs bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/40 px-3 py-1 rounded-lg transition-colors">Eliminar</button>` : ''}
-                    </td>
-                </tr>`;
-            }).join('');
-            tbody.querySelectorAll('.btn-invfisico-action').forEach(btn => {
-                btn.addEventListener('click', () => handleInvFisicoAction(btn.dataset.action, parseInt(btn.dataset.id)));
-            });
-        } catch (err) { console.error(err); }
-    }
-
-    async function handleInvFisicoAction(action, id) {
-        if (action === 'contar') {
-            openInvFisicoDetalle(id);
-        } else if (action === 'eliminar') {
-            const ok = await showConfirm('¿Eliminar esta sesión de inventario?');
-            if (!ok) return;
-            try {
-                await api.delete(`/api/inventory/inventario-fisico/${id}`);
-                showToast('Sesión eliminada.');
-                await fetchAndRenderInvFisico();
-            } catch (err) {
-                showToast(err.response?.data?.error ?? 'Error al eliminar', 'error');
-            }
-        }
-    }
-
-    // ── Modal de nueva sesión inv físico ──
-    const invFisicoModal       = document.getElementById('invfisico-modal');
-    const invFisicoForm        = document.getElementById('invfisico-form');
-    const invFisicoAlmacen     = document.getElementById('invfisico-almacen');
-    const closeInvFisicoBtn    = document.getElementById('close-invfisico-modal');
-    const cancelInvFisicoBtn   = document.getElementById('cancel-invfisico-modal');
-
-    document.getElementById('btn-nueva-sesion-inv')?.addEventListener('click', () => {
-        if (!almacenes.length) { showToast('No hay almacenes disponibles', 'warning'); return; }
-        invFisicoForm.reset();
-        invFisicoAlmacen.innerHTML = almacenes.filter(a => a.activo)
-            .map(a => `<option value="${a.id}">${esc(a.nombre)} (${esc(a.codigo)})</option>`).join('');
-        if (state.selectedAlmacen) invFisicoAlmacen.value = state.selectedAlmacen;
-        showModal(invFisicoModal);
-    });
-
-    [closeInvFisicoBtn, cancelInvFisicoBtn].forEach(el => el?.addEventListener('click', () => hideModal(invFisicoModal)));
-    invFisicoModal?.addEventListener('click', (e) => {
-        if (e.target === invFisicoModal || e.target.classList.contains('absolute')) hideModal(invFisicoModal);
-    });
-
-    invFisicoForm?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const data = Object.fromEntries(new FormData(invFisicoForm));
-        const submitBtn = invFisicoForm.querySelector('[type="submit"]');
-        submitBtn.disabled = true;
-        try {
-            await api.post('/api/inventory/inventario-fisico', data);
-            showToast('Sesión abierta. Snapshot tomado.');
-            hideModal(invFisicoModal);
-            await fetchAndRenderInvFisico();
-        } catch (err) {
-            showToast(err.response?.data?.error ?? 'Error al abrir sesión', 'error');
-        } finally {
-            submitBtn.disabled = false;
-        }
-    });
-
-    // ── Modal de detalle / conteo ──
-    const invFisicoDetalleModal  = document.getElementById('invfisico-detalle-modal');
-    const invFisicoDetalleTbody  = document.getElementById('invfisico-detalle-tbody');
-    const invFisicoDetalleInfo   = document.getElementById('invfisico-detalle-info');
-    const closeInvFisicoDetalleBtn  = document.getElementById('close-invfisico-detalle');
-    const cancelInvFisicoDetalleBtn = document.getElementById('cancel-invfisico-detalle');
-    const btnAplicarInvFisico       = document.getElementById('btn-aplicar-invfisico');
-    let invFisicoDetalleId = null;
-
-    async function openInvFisicoDetalle(id) {
-        invFisicoDetalleId = id;
-        invFisicoDetalleTbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400 dark:text-zinc-500">Cargando…</td></tr>';
-        showModal(invFisicoDetalleModal);
-        try {
-            const { data } = await api.get(`/api/inventory/inventario-fisico/${id}`);
-            invFisicoDetalleInfo.textContent = `${data.almacen?.nombre ?? ''} · Apertura: ${formatDate(data.fecha_apertura)} · ${data.items?.length ?? 0} productos`;
-            if (!data.items?.length) {
-                invFisicoDetalleTbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400 dark:text-zinc-500">Sin items.</td></tr>';
-                return;
-            }
-            invFisicoDetalleTbody.innerHTML = data.items.map(it => {
-                const contado = it.cantidad_contada;
-                const dif = contado != null ? (contado - it.cantidad_teorica) : null;
-                const difCls = dif == null ? 'text-slate-400 dark:text-zinc-500' :
-                                (dif === 0 ? 'text-slate-600 dark:text-zinc-300' :
-                                (dif > 0 ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-rose-600 dark:text-rose-400 font-semibold'));
-                const difTxt = dif == null ? '—' : (dif > 0 ? `+${dif}` : dif);
-                return `<tr>
-                    <td class="px-4 py-2 text-xs font-mono text-slate-500 dark:text-zinc-400">${esc(it.product?.sku ?? '—')}</td>
-                    <td class="px-4 py-2 text-sm text-slate-800 dark:text-zinc-100">${esc(it.product?.name ?? '—')}</td>
-                    <td class="px-4 py-2 text-center text-sm text-slate-600 dark:text-zinc-300 font-mono">${it.cantidad_teorica}</td>
-                    <td class="px-4 py-2 text-center">
-                        <input type="number" min="0" value="${contado ?? ''}" data-item-id="${it.id}" class="invfisico-conteo w-20 text-center rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 text-sm focus:border-emerald-500 focus:ring-emerald-500 py-1 px-2">
-                    </td>
-                    <td class="px-4 py-2 text-center text-sm ${difCls}">${difTxt}</td>
-                </tr>`;
-            }).join('');
-
-            // Auto-save on blur
-            invFisicoDetalleTbody.querySelectorAll('.invfisico-conteo').forEach(input => {
-                input.addEventListener('blur', async () => {
-                    const val = input.value === '' ? null : parseInt(input.value);
-                    if (val === null) return;
-                    if (val < 0 || isNaN(val)) { input.value = ''; return; }
-                    try {
-                        await api.patch(`/api/inventory/inventario-fisico/${invFisicoDetalleId}/items/${input.dataset.itemId}`, {
-                            cantidad_contada: val,
-                        });
-                        // Refrescar fila para mostrar diferencia
-                        const tr = input.closest('tr');
-                        const teorico = parseInt(tr.children[2].textContent.trim());
-                        const dif = val - teorico;
-                        const cell = tr.children[4];
-                        cell.className = 'px-4 py-2 text-center text-sm ' +
-                            (dif === 0 ? 'text-slate-600 dark:text-zinc-300' :
-                            (dif > 0 ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-rose-600 dark:text-rose-400 font-semibold'));
-                        cell.textContent = dif > 0 ? `+${dif}` : dif;
-                    } catch (err) {
-                        showToast('Error al guardar conteo', 'error');
-                    }
-                });
-            });
-        } catch (err) {
-            invFisicoDetalleTbody.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-rose-500">Error al cargar.</td></tr>';
-        }
-    }
-
-    [closeInvFisicoDetalleBtn, cancelInvFisicoDetalleBtn].forEach(el =>
-        el?.addEventListener('click', () => hideModal(invFisicoDetalleModal))
-    );
-    invFisicoDetalleModal?.addEventListener('click', (e) => {
-        if (e.target === invFisicoDetalleModal || e.target.classList.contains('absolute')) hideModal(invFisicoDetalleModal);
-    });
-
-    btnAplicarInvFisico?.addEventListener('click', async () => {
-        if (!invFisicoDetalleId) return;
-        const ok = await showConfirm('¿Aplicar ajustes de inventario?\nEsta acción generará movimientos automáticos y no se puede revertir.');
-        if (!ok) return;
-        try {
-            await api.post(`/api/inventory/inventario-fisico/${invFisicoDetalleId}/aplicar`);
-            showToast('Inventario aplicado. Stock ajustado.');
-            hideModal(invFisicoDetalleModal);
-            await Promise.all([fetchAndRenderInvFisico(), fetchProducts()]);
-            renderProducts();
-        } catch (err) {
-            showToast(err.response?.data?.error ?? 'Error al aplicar', 'error');
-        }
-    });
-
     // ─── Alertas de Stock ──────────────────────────────────────
     async function fetchAndRenderAlertas() {
         try {
@@ -1291,7 +1144,6 @@ document.addEventListener('DOMContentLoaded', () => {
         movements:     document.getElementById('section-movements'),
         almacenes:     document.getElementById('section-almacenes'),
         transferencias: document.getElementById('section-transferencias'),
-        'inv-fisico':  document.getElementById('section-inv-fisico'),
         alertas:       document.getElementById('section-alertas'),
     };
 
@@ -1300,7 +1152,6 @@ document.addEventListener('DOMContentLoaded', () => {
         movements:     tabMovementsBtn,
         almacenes:     document.getElementById('tab-almacenes'),
         transferencias: document.getElementById('tab-transferencias'),
-        'inv-fisico':  document.getElementById('tab-inv-fisico'),
         alertas:       document.getElementById('tab-alertas'),
     };
 
@@ -1343,7 +1194,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (tab === 'almacenes') renderAlmacenesGrid();
         if (tab === 'transferencias') fetchAndRenderTransferencias();
-        if (tab === 'inv-fisico') fetchAndRenderInvFisico();
         if (tab === 'alertas') fetchAndRenderAlertas();
     }
 
@@ -1472,6 +1322,74 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             importSubmitBtn.disabled = false;
             importSubmitBtn.textContent = 'Importar';
+        }
+    });
+
+    // ─── Asistente IA (chatbot) ────────────────────────────────
+    const aiFab      = document.getElementById('ai-fab');
+    const aiPanel    = document.getElementById('ai-panel');
+    const aiDrawer   = document.getElementById('ai-drawer');
+    const aiOverlay  = document.getElementById('ai-overlay');
+    const aiCloseBtn = document.getElementById('ai-close');
+    const aiForm     = document.getElementById('ai-form');
+    const aiInput    = document.getElementById('ai-input');
+    const aiSend     = document.getElementById('ai-send');
+    const aiMessages = document.getElementById('ai-messages');
+    let aiBusy = false;
+
+    function openAiPanel() {
+        aiPanel?.classList.remove('hidden');
+        requestAnimationFrame(() => aiDrawer?.classList.remove('translate-x-full'));
+        setTimeout(() => aiInput?.focus(), 200);
+    }
+    function closeAiPanel() {
+        aiDrawer?.classList.add('translate-x-full');
+        setTimeout(() => aiPanel?.classList.add('hidden'), 200);
+    }
+
+    aiFab?.addEventListener('click', openAiPanel);
+    aiCloseBtn?.addEventListener('click', closeAiPanel);
+    aiOverlay?.addEventListener('click', closeAiPanel);
+
+    function appendAiMessage(text, who) {
+        const wrap = document.createElement('div');
+        wrap.className = who === 'user' ? 'flex justify-end' : 'flex justify-start';
+        const bubble = document.createElement('div');
+        bubble.className = who === 'user'
+            ? 'max-w-[85%] bg-emerald-600 text-white rounded-2xl rounded-br-sm px-3.5 py-2 text-sm whitespace-pre-wrap'
+            : 'max-w-[85%] bg-slate-100 dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 rounded-2xl rounded-bl-sm px-3.5 py-2 text-sm whitespace-pre-wrap';
+        bubble.textContent = text;
+        wrap.appendChild(bubble);
+        aiMessages?.appendChild(wrap);
+        if (aiMessages) aiMessages.scrollTop = aiMessages.scrollHeight;
+        return wrap;
+    }
+
+    aiForm?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const message = aiInput.value.trim();
+        if (!message || aiBusy) return;
+
+        aiBusy = true;
+        aiSend.disabled = true;
+        aiInput.value = '';
+        appendAiMessage(message, 'user');
+
+        const typing = appendAiMessage('Escribiendo…', 'bot');
+        typing.querySelector('div').classList.add('opacity-60', 'italic');
+
+        try {
+            const { data } = await api.post('/api/inventory/ai/chat', { message });
+            typing.remove();
+            appendAiMessage(data.reply || 'Sin respuesta.', 'bot');
+        } catch (err) {
+            typing.remove();
+            const msg = err.response?.data?.message || 'El asistente no está disponible en este momento.';
+            appendAiMessage(msg, 'bot');
+        } finally {
+            aiBusy = false;
+            aiSend.disabled = false;
+            aiInput.focus();
         }
     });
 

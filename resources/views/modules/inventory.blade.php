@@ -110,10 +110,6 @@
             class="pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300 transition-colors whitespace-nowrap">
             Transferencias
         </button>
-        <button id="tab-inv-fisico"
-            class="pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300 transition-colors whitespace-nowrap">
-            Inventario Físico
-        </button>
         <button id="tab-alertas"
             class="pb-3 text-sm font-semibold border-b-2 border-transparent text-rose-500 dark:text-rose-400 hover:text-rose-600 dark:hover:text-rose-300 transition-colors whitespace-nowrap flex items-center gap-1">
             <span id="alertas-badge" class="hidden w-2 h-2 rounded-full bg-rose-500"></span>
@@ -396,37 +392,6 @@
         </div>
     </div>
 
-    <!-- SECTION: INVENTARIO FÍSICO -->
-    <div id="section-inv-fisico" class="hidden space-y-4">
-        <div class="flex justify-between items-center">
-            <h3 class="text-sm font-semibold text-slate-700 dark:text-zinc-300">Sesiones de inventario físico</h3>
-            <button id="btn-nueva-sesion-inv" class="bg-emerald-600 hover:bg-emerald-700 active:-translate-y-px text-white px-4 py-2.5 rounded-xl font-semibold text-sm transition-all flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-                Nueva sesión
-            </button>
-        </div>
-        <div class="bg-white dark:bg-zinc-900 border border-slate-200/70 dark:border-zinc-800 rounded-2xl overflow-hidden">
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-sm border-collapse">
-                    <thead>
-                        <tr class="bg-slate-50 dark:bg-zinc-800/60 border-b border-slate-200 dark:border-zinc-700 text-[11px] font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">
-                            <th class="px-5 py-3.5">Almacén</th>
-                            <th class="px-5 py-3.5">Apertura</th>
-                            <th class="px-5 py-3.5">Cierre</th>
-                            <th class="px-5 py-3.5 text-right">Diferencia $</th>
-                            <th class="px-5 py-3.5">Estado</th>
-                            <th class="px-5 py-3.5">Usuario</th>
-                            <th class="px-5 py-3.5 text-right">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tbody-inv-fisico" class="divide-y divide-slate-100 dark:divide-zinc-800">
-                        <tr><td colspan="7" class="px-5 py-6 text-center text-slate-400 dark:text-zinc-500">Cargando...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
     <!-- SECTION: ALERTAS DE STOCK -->
     <div id="section-alertas" class="hidden space-y-4">
         <div class="flex justify-between items-center">
@@ -615,76 +580,43 @@
         </div>
     </div>
 
-    <!-- MODAL: NUEVA SESIÓN INVENTARIO FÍSICO -->
-    <div id="invfisico-modal" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 flex">
-        <div class="absolute inset-0 bg-slate-900/50 dark:bg-black/60 backdrop-blur-sm"></div>
-        <div class="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 dark:border-zinc-800">
-            <div class="p-6 sm:p-8">
-                <div class="flex justify-between items-center mb-5">
-                    <h3 class="text-xl font-bold text-slate-800 dark:text-zinc-50">Nueva Sesión de Inventario</h3>
-                    <button type="button" id="close-invfisico-modal" class="text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300 transition-colors">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                    </button>
-                </div>
-                @php $inpI = 'w-full rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 focus:bg-white dark:focus:bg-zinc-700 focus:border-emerald-500 focus:ring-emerald-500 transition-colors text-sm'; @endphp
-                <form id="invfisico-form" class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Almacén <span class="text-rose-500">*</span></label>
-                        <select name="almacen_id" id="invfisico-almacen" required class="{{ $inpI }}"></select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Notas</label>
-                        <textarea name="notas" rows="2" maxlength="1000" class="{{ $inpI }}"></textarea>
-                    </div>
-                    <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/40 rounded-xl p-3 text-xs text-amber-800 dark:text-amber-300">
-                        Al abrir la sesión se tomará un snapshot del stock actual. Luego registrarás el conteo físico de cada producto.
-                    </div>
-                    <div class="pt-2 flex justify-end gap-3">
-                        <button type="button" id="cancel-invfisico-modal"
-                            class="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800 font-medium text-sm transition-colors">Cancelar</button>
-                        <button type="submit"
-                            class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-all">Abrir sesión</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
+    {{-- ─── Asistente IA (chatbot) ─────────────────────────── --}}
+    <!-- Botón flotante -->
+    <button id="ai-fab" type="button"
+        class="fixed bottom-6 right-6 z-[90] w-14 h-14 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/30 flex items-center justify-center transition-all hover:-translate-y-0.5"
+        title="Asistente IA">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"/></svg>
+    </button>
 
-    <!-- MODAL: DETALLE INVENTARIO FÍSICO (conteo) -->
-    <div id="invfisico-detalle-modal" class="fixed inset-0 z-[100] hidden items-center justify-center p-4 flex">
-        <div class="absolute inset-0 bg-slate-900/50 dark:bg-black/60 backdrop-blur-sm"></div>
-        <div class="relative bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden border border-slate-100 dark:border-zinc-800 flex flex-col">
-            <div class="p-6 sm:p-8 overflow-y-auto">
-                <div class="flex justify-between items-center mb-5">
+    <!-- Panel deslizante -->
+    <div id="ai-panel" class="fixed inset-0 z-[95] hidden">
+        <div id="ai-overlay" class="absolute inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm"></div>
+        <div id="ai-drawer" class="absolute top-0 right-0 h-full w-full max-w-md bg-white dark:bg-zinc-900 border-l border-slate-200 dark:border-zinc-800 shadow-2xl flex flex-col translate-x-full transition-transform duration-200">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-zinc-800">
+                <div class="flex items-center gap-2">
+                    <span class="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
+                    </span>
                     <div>
-                        <h3 class="text-xl font-bold text-slate-800 dark:text-zinc-50">Conteo Físico</h3>
-                        <p id="invfisico-detalle-info" class="text-xs text-slate-500 dark:text-zinc-400 mt-1"></p>
+                        <h3 class="text-sm font-semibold text-slate-800 dark:text-zinc-100">Asistente de Inventario</h3>
+                        <p class="text-[11px] text-slate-400 dark:text-zinc-500">Powered by IA local</p>
                     </div>
-                    <button type="button" id="close-invfisico-detalle" class="text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300 transition-colors">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                    </button>
                 </div>
-                <div class="overflow-x-auto border border-slate-200 dark:border-zinc-800 rounded-xl">
-                    <table class="w-full text-sm">
-                        <thead class="bg-slate-50 dark:bg-zinc-800/60">
-                            <tr class="text-[11px] font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">
-                                <th class="px-4 py-2 text-left">SKU</th>
-                                <th class="px-4 py-2 text-left">Producto</th>
-                                <th class="px-4 py-2 text-center">Teórico</th>
-                                <th class="px-4 py-2 text-center">Contado</th>
-                                <th class="px-4 py-2 text-center">Diferencia</th>
-                            </tr>
-                        </thead>
-                        <tbody id="invfisico-detalle-tbody" class="divide-y divide-slate-100 dark:divide-zinc-800"></tbody>
-                    </table>
-                </div>
-                <div class="pt-4 flex justify-end gap-3">
-                    <button type="button" id="cancel-invfisico-detalle"
-                        class="px-5 py-2.5 rounded-xl border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800 font-medium text-sm transition-colors">Cerrar</button>
-                    <button type="button" id="btn-aplicar-invfisico"
-                        class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-all">Aplicar ajustes</button>
+                <button type="button" id="ai-close" class="text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div id="ai-messages" class="flex-1 overflow-y-auto p-4 space-y-3">
+                <div class="text-xs text-slate-500 dark:text-zinc-400 bg-slate-50 dark:bg-zinc-800/60 rounded-xl p-3">
+                    ¡Hola! Puedo ayudarte con datos de tu inventario. Prueba: <em>"¿cuáles son los productos con stock bajo?"</em>
                 </div>
             </div>
+            <form id="ai-form" class="p-3 border-t border-slate-200 dark:border-zinc-800 flex gap-2">
+                <input id="ai-input" type="text" autocomplete="off" placeholder="Escribe tu pregunta..."
+                    class="flex-1 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 focus:bg-white dark:focus:bg-zinc-700 focus:border-emerald-500 focus:ring-emerald-500 transition-colors text-sm px-3 py-2.5">
+                <button type="submit" id="ai-send"
+                    class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 rounded-xl font-semibold text-sm transition-all disabled:opacity-50">Enviar</button>
+            </form>
         </div>
     </div>
 

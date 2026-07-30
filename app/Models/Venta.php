@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Inventory\Almacen;
 use Illuminate\Database\Eloquent\Model;
 
 class Venta extends Model
@@ -10,30 +11,22 @@ class Venta extends Model
 
     protected $fillable = [
         'user_id', 'total', 'estado', 'fecha', 'referencia', 'notas',
-        'forma_pago', 'cuenta_id', 'moneda_id', 'tipo_cambio',
-        'fecha_vencimiento', 'cliente', 'cliente_rfc',
+        'cliente', 'metodo_pago', 'almacen_id',
     ];
 
     protected $casts = [
-        'total'             => 'decimal:2',
-        'fecha'             => 'datetime',
-        'fecha_vencimiento' => 'date',
-        'tipo_cambio'       => 'decimal:8',
+        'total' => 'decimal:2',
+        'fecha' => 'datetime',
     ];
-
-    public function cuenta()
-    {
-        return $this->belongsTo(\App\Models\Finance\Cuenta::class, 'cuenta_id');
-    }
-
-    public function moneda()
-    {
-        return $this->belongsTo(\App\Models\Finance\Moneda::class, 'moneda_id');
-    }
 
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function almacen()
+    {
+        return $this->belongsTo(Almacen::class);
     }
 
     public function items()

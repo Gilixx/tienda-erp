@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\User;
 use App\Models\Service;
+use App\Models\User;
+use Illuminate\Database\Seeder;
 
 class TestUserSeeder extends Seeder
 {
@@ -18,22 +18,19 @@ class TestUserSeeder extends Seeder
         $user->is_active = true;
         $user->save();
 
-        $service = Service::firstOrCreate(
+        $inventory = Service::firstOrCreate(
             ['key' => 'inventory'],
             ['name' => 'Sistema de Inventarios', 'description' => 'Módulo de Inventarios', 'icon' => 'box']
         );
 
-        $user->services()->syncWithoutDetaching([
-            $service->id => ['expires_at' => now()->addYears(10)]
-        ]);
-        
-        $serviceFinance = Service::firstOrCreate(
-            ['key' => 'finance'],
-            ['name' => 'Sistema de Finanzas', 'description' => 'Módulo de Finanzas', 'icon' => 'dollar-sign']
+        $pos = Service::firstOrCreate(
+            ['key' => 'pos'],
+            ['name' => 'Punto de Venta', 'description' => 'Terminal de ventas y reportes', 'icon' => 'pos']
         );
-        
+
         $user->services()->syncWithoutDetaching([
-            $serviceFinance->id => ['expires_at' => now()->addYears(10)]
+            $inventory->id => ['expires_at' => now()->addYears(10)],
+            $pos->id => ['expires_at' => now()->addYears(10)],
         ]);
     }
 }

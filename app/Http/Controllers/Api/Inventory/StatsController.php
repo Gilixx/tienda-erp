@@ -8,13 +8,11 @@ use App\Models\VentaItem;
 use App\Services\OllamaService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class StatsController extends Controller
 {
-    private const CACHE_TTL_REPORT = 7200; // 2h
     private const STALE_DAYS = 30;
 
     /**
@@ -27,70 +25,81 @@ class StatsController extends Controller
         $since = Carbon::now()->subDays($days);
 
         return response()->json([
-            'top_products'   => $this->topProducts($since, 10),
-            'daily_sales'    => $this->dailySales($since),
+            'top_products' => $this->topProducts($since, 10),
+            'daily_sales' => $this->dailySales($since),
             'stale_products' => $this->staleProducts(),
-            'summary'        => $this->summary($since),
-            'period_days'    => $days,
+            'summary' => $this->summary($since),
+            'period_days' => $days,
         ]);
     }
 
     /**
-     * Genera informe IA (cacheado).
+     * Chatbot IA: responde preguntas sobre el inventario con datos reales.
      */
-    public function report(Request $request, OllamaService $ollama)
+    public function chat(Request $request, OllamaService $ollama)
     {
-        // PHP corta scripts en 30s por defecto; el informe IA puede tardar más.
+        // El modelo local puede tardar; ampliamos el límite de ejecución.
         @set_time_limit(300);
         @ini_set('max_execution_time', '300');
 
-        $days = (int) $request->input('days', 90);
-        $days = max(7, min(365, $days));
-
-        $force = $request->boolean('refresh', false);
-        $cacheKey = "stats.report.{$days}";
-
-        if ($force) {
-            Cache::forget($cacheKey);
-        }
+        $validated = $request->validate([
+            'message' => 'required|string|max:1000',
+        ]);
 
         try {
-            $report = Cache::remember($cacheKey, self::CACHE_TTL_REPORT, function () use ($ollama, $days) {
-                $since = Carbon::now()->subDays($days);
+            $context = $this->inventorySnapshot();
+            $reply = $ollama->chat($validated['message'], $context);
 
-                $data = [
-                    'period_days'    => $days,
-                    'summary'        => $this->summary($since),
-                    'top_products'   => $this->topProducts($since, 10),
-                    'stale_products' => array_slice($this->staleProducts(), 0, 10),
-                    'monthly_trend'  => $this->monthlyTrend($since),
-                ];
+            Log::info('Chat IA inventario', [
+                'user_id' => auth()->id(),
+                'chars' => strlen($reply),
+            ]);
 
-                $prompt = $this->buildPrompt($data);
-                $system = 'Eres un analista de negocios experto en retail. Respondes SIEMPRE en español, en formato Markdown limpio, con secciones claras y bullets. Sé conciso y orientado a acciones.';
-
-                $content = $ollama->generate($prompt, $system);
-
-                Log::info('Informe IA generado', [
-                    'user_id' => auth()->id(),
-                    'days'    => $days,
-                    'chars'   => strlen($content),
-                ]);
-
-                return [
-                    'content'      => $content,
-                    'generated_at' => now()->toIso8601String(),
-                    'data'         => $data,
-                ];
-            });
-
-            return response()->json($report + ['cached' => ! $force]);
+            return response()->json(['reply' => $reply]);
         } catch (\RuntimeException $e) {
             return response()->json([
-                'message' => $e->getMessage(),
-                'hint'    => 'Verifica que Ollama esté corriendo en ' . config('services.ollama.url'),
+                'message' => 'El asistente IA no está disponible. Verifica que Ollama esté corriendo en '.config('services.ollama.url'),
             ], 503);
         }
+    }
+
+    /**
+     * Snapshot compacto del inventario para dar contexto a la IA.
+     *
+     * @return array<string,mixed>
+     */
+    private function inventorySnapshot(): array
+    {
+        $since = Carbon::now()->subDays(30);
+
+        $totalProductos = Product::where('is_active', true)->count();
+        $stockTotal = (int) Product::where('is_active', true)->sum('stock');
+        $valorInventario = (float) Product::where('is_active', true)
+            ->selectRaw('COALESCE(SUM(stock * cost), 0) as v')->value('v');
+
+        $stockBajo = Product::query()
+            ->where('is_active', true)
+            ->whereColumn('stock', '<=', 'min_stock')
+            ->orderBy('stock')
+            ->limit(20)
+            ->get(['sku', 'name', 'stock', 'min_stock'])
+            ->map(fn ($p) => [
+                'sku' => $p->sku,
+                'name' => $p->name,
+                'stock' => (int) $p->stock,
+                'min_stock' => (int) $p->min_stock,
+            ])
+            ->all();
+
+        return [
+            'generado' => now()->toDateTimeString(),
+            'total_productos_activos' => $totalProductos,
+            'unidades_en_stock' => $stockTotal,
+            'valor_inventario_costo' => round($valorInventario, 2),
+            'productos_stock_bajo' => $stockBajo,
+            'ventas_ultimos_30d' => $this->summary($since),
+            'top_productos_30d' => $this->topProducts($since, 5),
+        ];
     }
 
     // ─── Agregados ────────────────────────────────────────────
@@ -108,10 +117,10 @@ class StatsController extends Controller
             ->limit($limit)
             ->get()
             ->map(fn ($r) => [
-                'sku'       => $r->product?->sku ?? 'N/A',
-                'name'      => $r->product?->name ?? 'Eliminado',
-                'unidades'  => (int) $r->total_unidades,
-                'ingresos'  => (float) $r->total_ingresos,
+                'sku' => $r->product?->sku ?? 'N/A',
+                'name' => $r->product?->name ?? 'Eliminado',
+                'unidades' => (int) $r->total_unidades,
+                'ingresos' => (float) $r->total_ingresos,
             ])
             ->all();
     }
@@ -130,8 +139,8 @@ class StatsController extends Controller
             ->orderBy('dia')
             ->get()
             ->map(fn ($r) => [
-                'dia'      => $r->dia,
-                'ventas'   => (int) $r->ventas,
+                'dia' => $r->dia,
+                'ventas' => (int) $r->ventas,
                 'ingresos' => (float) $r->ingresos,
             ])
             ->all();
@@ -147,7 +156,7 @@ class StatsController extends Controller
             ->leftJoin('venta_items', 'venta_items.product_id', '=', 'products.id')
             ->leftJoin('ventas', function ($j) {
                 $j->on('ventas.id', '=', 'venta_items.venta_id')
-                  ->where('ventas.estado', '=', 'completada');
+                    ->where('ventas.estado', '=', 'completada');
             })
             ->where('products.is_active', true)
             ->groupBy('products.id', 'products.sku', 'products.name', 'products.stock')
@@ -156,10 +165,10 @@ class StatsController extends Controller
             ->limit(20)
             ->get()
             ->map(fn ($r) => [
-                'sku'           => $r->sku,
-                'name'          => $r->name,
-                'stock'         => (int) $r->stock,
-                'ultima_venta'  => $r->ultima_venta,
+                'sku' => $r->sku,
+                'name' => $r->name,
+                'stock' => (int) $r->stock,
+                'ultima_venta' => $r->ultima_venta,
                 'dias_sin_venta' => $r->ultima_venta
                     ? Carbon::parse($r->ultima_venta)->diffInDays(now())
                     : null,
@@ -182,67 +191,10 @@ class StatsController extends Controller
             ->sum('cantidad');
 
         return [
-            'total_ventas'      => (int) $ventas->total_ventas,
-            'ingresos_totales'  => (float) $ventas->ingresos,
-            'ticket_promedio'   => round((float) $ventas->ticket_prom, 2),
+            'total_ventas' => (int) $ventas->total_ventas,
+            'ingresos_totales' => (float) $ventas->ingresos,
+            'ticket_promedio' => round((float) $ventas->ticket_prom, 2),
             'unidades_vendidas' => (int) $unidades,
         ];
-    }
-
-    private function monthlyTrend(Carbon $since): array
-    {
-        return DB::table('ventas')
-            ->select(
-                DB::raw("DATE_FORMAT(fecha, '%Y-%m') as mes"),
-                DB::raw('COUNT(*) as ventas'),
-                DB::raw('SUM(total) as ingresos')
-            )
-            ->where('fecha', '>=', $since)
-            ->where('estado', 'completada')
-            ->groupBy('mes')
-            ->orderBy('mes')
-            ->get()
-            ->map(fn ($r) => [
-                'mes'      => $r->mes,
-                'ventas'   => (int) $r->ventas,
-                'ingresos' => (float) $r->ingresos,
-            ])
-            ->all();
-    }
-
-    private function buildPrompt(array $data): string
-    {
-        $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-
-        return <<<PROMPT
-Analiza estos datos de ventas ({$data['period_days']} días) y genera un informe BREVE en español, Markdown.
-
-DATOS:
-```json
-{$json}
-```
-
-Usa EXACTAMENTE estas secciones, MUY concisas (máximo 2 bullets cada una):
-
-## Resumen
-1 línea con lo clave.
-
-## Top 3 Productos
-Solo los 3 más vendidos con número de unidades.
-
-## Productos Estancados
-2-3 productos sin movimiento + acción sugerida (1 línea c/u).
-
-## Proyección
-1 línea: estimación próximas 4 semanas.
-
-## Acciones Recomendadas
-3 bullets cortos, accionables.
-
-REGLAS:
-- Sé telegráfico. Sin párrafos largos.
-- Usa números reales del JSON.
-- No inventes datos.
-PROMPT;
     }
 }

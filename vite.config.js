@@ -9,8 +9,7 @@ export default defineConfig({
                 'resources/css/app.css',
                 'resources/js/app.js',
                 'resources/js/inventory.js',
-                'resources/js/statistics.js',
-                'resources/js/finance.js'
+                'resources/js/pos.js'
             ],
             refresh: true,
         }),

@@ -45,15 +45,17 @@ Route::middleware('auth')->group(function () {
         Route::get('/dashboard/inventory', function () {
             return view('modules.inventory');
         })->name('inventory');
-
-        Route::get('/dashboard/inventory/estadisticas', function () {
-            return view('modules.estadisticas');
-        })->name('inventory.stats');
     });
 
-    Route::middleware('service:finance')->group(function () {
-        Route::get('/dashboard/finance', function () {
-            return view('modules.finance');
-        })->name('finance');
+    // Punto de venta — pantalla completa
+    Route::middleware('service:pos')->group(function () {
+        Route::get('/dashboard/pos', function (\Illuminate\Http\Request $request) {
+            $almacenes = \App\Models\Inventory\Almacen::accesiblesPara($request->user())
+                ->orderByDesc('es_principal')
+                ->orderBy('nombre')
+                ->get(['id', 'nombre', 'codigo', 'es_principal']);
+
+            return view('modules.pos', compact('almacenes'));
+        })->name('pos');
     });
 });

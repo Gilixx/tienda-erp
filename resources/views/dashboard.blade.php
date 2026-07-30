@@ -42,17 +42,17 @@
                 @php
                     $href = match($service->key) {
                         'inventory' => route('inventory'),
-                        'finance'   => route('finance'),
+                        'pos'       => route('pos'),
                         default     => '#',
                     };
                     $colorClass = match($service->key) {
                         'inventory' => 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400',
-                        'finance'   => 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400',
+                        'pos'       => 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400',
                         default     => 'bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400',
                     };
                     $borderAccent = match($service->key) {
                         'inventory' => 'border-l-[3px] border-l-emerald-500',
-                        'finance'   => 'border-l-[3px] border-l-amber-500',
+                        'pos'       => 'border-l-[3px] border-l-indigo-500',
                         default     => 'border-l-[3px] border-l-slate-300 dark:border-l-zinc-600',
                     };
                 @endphp
@@ -64,9 +64,9 @@
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                                 </svg>
-                            @elseif($service->key === 'finance')
+                            @elseif($service->key === 'pos')
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
                                 </svg>
                             @else
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75">
