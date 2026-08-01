@@ -3,9 +3,10 @@
 namespace App\Http\Controllers\Api\Inventory;
 
 use App\Http\Controllers\Controller;
+use App\Models\Inventory\Almacen;
 use App\Models\Product;
 use App\Models\VentaItem;
-use App\Services\OllamaService;
+use App\Services\GroqService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -23,12 +24,13 @@ class StatsController extends Controller
         $days = (int) $request->input('days', 90);
         $days = max(7, min(365, $days));
         $since = Carbon::now()->subDays($days);
+        $almacenIds = $this->accesibleAlmacenIds();
 
         return response()->json([
-            'top_products' => $this->topProducts($since, 10),
-            'daily_sales' => $this->dailySales($since),
-            'stale_products' => $this->staleProducts(),
-            'summary' => $this->summary($since),
+            'top_products' => $this->topProducts($since, 10, $almacenIds),
+            'daily_sales' => $this->dailySales($since, $almacenIds),
+            'stale_products' => $this->staleProducts($almacenIds),
+            'summary' => $this->summary($since, $almacenIds),
             'period_days' => $days,
         ]);
     }
@@ -36,7 +38,7 @@ class StatsController extends Controller
     /**
      * Chatbot IA: responde preguntas sobre el inventario con datos reales.
      */
-    public function chat(Request $request, OllamaService $ollama)
+    public function chat(Request $request, GroqService $ai)
     {
         // El modelo local puede tardar; ampliamos el límite de ejecución.
         @set_time_limit(300);
@@ -48,7 +50,7 @@ class StatsController extends Controller
 
         try {
             $context = $this->inventorySnapshot();
-            $reply = $ollama->chat($validated['message'], $context);
+            $reply = $ai->chat($validated['message'], $context);
 
             Log::info('Chat IA inventario', [
                 'user_id' => auth()->id(),
@@ -58,7 +60,7 @@ class StatsController extends Controller
             return response()->json(['reply' => $reply]);
         } catch (\RuntimeException $e) {
             return response()->json([
-                'message' => 'El asistente IA no está disponible. Verifica que Ollama esté corriendo en '.config('services.ollama.url'),
+                'message' => 'El asistente IA no está disponible. Intenta de nuevo en unos momentos.',
             ], 503);
         }
     }
@@ -71,6 +73,7 @@ class StatsController extends Controller
     private function inventorySnapshot(): array
     {
         $since = Carbon::now()->subDays(30);
+        $almacenIds = $this->accesibleAlmacenIds();
 
         $totalProductos = Product::where('is_active', true)->count();
         $stockTotal = (int) Product::where('is_active', true)->sum('stock');
@@ -97,20 +100,35 @@ class StatsController extends Controller
             'unidades_en_stock' => $stockTotal,
             'valor_inventario_costo' => round($valorInventario, 2),
             'productos_stock_bajo' => $stockBajo,
-            'ventas_ultimos_30d' => $this->summary($since),
-            'top_productos_30d' => $this->topProducts($since, 5),
+            'ventas_ultimos_30d' => $this->summary($since, $almacenIds),
+            'top_productos_30d' => $this->topProducts($since, 5, $almacenIds),
         ];
+    }
+
+    /**
+     * IDs de almacenes accesibles para el usuario actual (admin ve todos).
+     *
+     * @return array<int,int>
+     */
+    private function accesibleAlmacenIds(): array
+    {
+        return Almacen::accesiblesPara(auth()->user())->pluck('id')->all();
     }
 
     // ─── Agregados ────────────────────────────────────────────
 
-    private function topProducts(Carbon $since, int $limit = 10): array
+    /**
+     * @param  array<int,int>  $almacenIds
+     */
+    private function topProducts(Carbon $since, int $limit, array $almacenIds): array
     {
         return VentaItem::query()
             ->select('product_id',
                 DB::raw('SUM(cantidad) as total_unidades'),
                 DB::raw('SUM(subtotal) as total_ingresos'))
-            ->whereHas('venta', fn ($q) => $q->where('fecha', '>=', $since)->where('estado', 'completada'))
+            ->whereHas('venta', fn ($q) => $q->where('fecha', '>=', $since)
+                ->where('estado', 'completada')
+                ->whereIn('almacen_id', $almacenIds))
             ->with('product:id,name,sku')
             ->groupBy('product_id')
             ->orderByDesc('total_unidades')
@@ -125,7 +143,10 @@ class StatsController extends Controller
             ->all();
     }
 
-    private function dailySales(Carbon $since): array
+    /**
+     * @param  array<int,int>  $almacenIds
+     */
+    private function dailySales(Carbon $since, array $almacenIds): array
     {
         return DB::table('ventas')
             ->select(
@@ -135,6 +156,7 @@ class StatsController extends Controller
             )
             ->where('fecha', '>=', $since)
             ->where('estado', 'completada')
+            ->whereIn('almacen_id', $almacenIds)
             ->groupBy('dia')
             ->orderBy('dia')
             ->get()
@@ -146,7 +168,10 @@ class StatsController extends Controller
             ->all();
     }
 
-    private function staleProducts(): array
+    /**
+     * @param  array<int,int>  $almacenIds
+     */
+    private function staleProducts(array $almacenIds): array
     {
         $threshold = Carbon::now()->subDays(self::STALE_DAYS);
 
@@ -154,9 +179,10 @@ class StatsController extends Controller
             ->select('products.id', 'products.sku', 'products.name', 'products.stock',
                 DB::raw('MAX(ventas.fecha) as ultima_venta'))
             ->leftJoin('venta_items', 'venta_items.product_id', '=', 'products.id')
-            ->leftJoin('ventas', function ($j) {
+            ->leftJoin('ventas', function ($j) use ($almacenIds) {
                 $j->on('ventas.id', '=', 'venta_items.venta_id')
-                    ->where('ventas.estado', '=', 'completada');
+                    ->where('ventas.estado', '=', 'completada')
+                    ->whereIn('ventas.almacen_id', $almacenIds);
             })
             ->where('products.is_active', true)
             ->groupBy('products.id', 'products.sku', 'products.name', 'products.stock')
@@ -176,11 +202,15 @@ class StatsController extends Controller
             ->all();
     }
 
-    private function summary(Carbon $since): array
+    /**
+     * @param  array<int,int>  $almacenIds
+     */
+    private function summary(Carbon $since, array $almacenIds): array
     {
         $ventas = DB::table('ventas')
             ->where('fecha', '>=', $since)
             ->where('estado', 'completada')
+            ->whereIn('almacen_id', $almacenIds)
             ->selectRaw('COUNT(*) as total_ventas, COALESCE(SUM(total),0) as ingresos, COALESCE(AVG(total),0) as ticket_prom')
             ->first();
 
@@ -188,6 +218,7 @@ class StatsController extends Controller
             ->join('ventas', 'ventas.id', '=', 'venta_items.venta_id')
             ->where('ventas.fecha', '>=', $since)
             ->where('ventas.estado', 'completada')
+            ->whereIn('ventas.almacen_id', $almacenIds)
             ->sum('cantidad');
 
         return [

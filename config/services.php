@@ -28,11 +28,11 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
-    'ollama' => [
-        'url'        => env('OLLAMA_URL', 'http://127.0.0.1:11434'),
-        'model'      => env('OLLAMA_MODEL', 'llama3.2:3b'),
-        'timeout'    => env('OLLAMA_TIMEOUT', 180),
-        'keep_alive' => env('OLLAMA_KEEP_ALIVE', '24h'),
+    'groq' => [
+        'url' => env('GROQ_URL', 'https://api.groq.com/openai/v1'),
+        'key' => env('GROQ_API_KEY'),
+        'model' => env('GROQ_MODEL', 'llama-3.1-8b-instant'),
+        'timeout' => env('GROQ_TIMEOUT', 60),
     ],
 
     'slack' => [

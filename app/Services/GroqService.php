@@ -5,43 +5,22 @@ namespace App\Services;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-class OllamaService
+class GroqService
 {
     private string $baseUrl;
+
+    private string $apiKey;
 
     private string $model;
 
     private int $timeout;
 
-    private string $keepAlive;
-
     public function __construct()
     {
-        $this->baseUrl = rtrim(config('services.ollama.url', 'http://127.0.0.1:11434'), '/');
-        $this->model = config('services.ollama.model', 'llama3.2:3b');
-        $this->timeout = (int) config('services.ollama.timeout', 180);
-        $this->keepAlive = config('services.ollama.keep_alive', '24h');
-    }
-
-    /**
-     * Pre-carga el modelo en memoria (sin generar). Ideal para warmup.
-     */
-    public function warmup(): bool
-    {
-        try {
-            $response = Http::timeout(120)->post($this->baseUrl.'/api/generate', [
-                'model' => $this->model,
-                'prompt' => '',
-                'stream' => false,
-                'keep_alive' => $this->keepAlive,
-            ]);
-
-            return $response->successful();
-        } catch (\Throwable $e) {
-            Log::warning('Ollama warmup failed', ['error' => $e->getMessage()]);
-
-            return false;
-        }
+        $this->baseUrl = rtrim(config('services.groq.url', 'https://api.groq.com/openai/v1'), '/');
+        $this->apiKey = (string) config('services.groq.key', '');
+        $this->model = config('services.groq.model', 'llama-3.1-8b-instant');
+        $this->timeout = (int) config('services.groq.timeout', 60);
     }
 
     /**
@@ -49,38 +28,39 @@ class OllamaService
      */
     public function generate(string $prompt, ?string $system = null): string
     {
-        $payload = [
-            'model' => $this->model,
-            'prompt' => $prompt,
-            'stream' => false,
-            'keep_alive' => $this->keepAlive,
-            'options' => [
-                'temperature' => 0.3,
-                'num_predict' => 600,
-            ],
-        ];
-
-        if ($system) {
-            $payload['system'] = $system;
+        if ($this->apiKey === '') {
+            throw new \RuntimeException('Falta configurar GROQ_API_KEY.');
         }
 
+        $messages = [];
+        if ($system) {
+            $messages[] = ['role' => 'system', 'content' => $system];
+        }
+        $messages[] = ['role' => 'user', 'content' => $prompt];
+
         $response = Http::timeout($this->timeout)
-            ->post($this->baseUrl.'/api/generate', $payload);
+            ->withToken($this->apiKey)
+            ->post($this->baseUrl.'/chat/completions', [
+                'model' => $this->model,
+                'messages' => $messages,
+                'temperature' => 0.3,
+                'max_tokens' => 600,
+            ]);
 
         if (! $response->successful()) {
-            Log::error('Ollama error', [
+            Log::error('Groq error', [
                 'status' => $response->status(),
                 'body' => $response->body(),
             ]);
             throw new \RuntimeException('Servicio IA no disponible (HTTP '.$response->status().')');
         }
 
-        return trim($response->json('response', ''));
+        return trim((string) $response->json('choices.0.message.content', ''));
     }
 
     /**
      * Responde una pregunta del usuario usando un snapshot del inventario
-     * como contexto. No hace streaming (consistente con generate()).
+     * como contexto.
      *
      * @param  array<string,mixed>  $context  Snapshot de stats del inventario.
      */
@@ -104,8 +84,15 @@ SYS;
 
     public function ping(): bool
     {
+        if ($this->apiKey === '') {
+            return false;
+        }
+
         try {
-            return Http::timeout(3)->get($this->baseUrl)->successful();
+            return Http::timeout(5)
+                ->withToken($this->apiKey)
+                ->get($this->baseUrl.'/models')
+                ->successful();
         } catch (\Throwable $e) {
             return false;
         }
