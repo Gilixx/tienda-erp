@@ -3,14 +3,15 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, SoftDeletes;
 
     /**
      * The attributes that are mass assignable.
@@ -45,6 +46,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',  // auto-bcrypt on assignment
             'is_active' => 'boolean',
+            'force_password_change' => 'boolean',
         ];
     }
 
@@ -54,8 +56,18 @@ class User extends Authenticatable
     public function services(): BelongsToMany
     {
         return $this->belongsToMany(Service::class, 'user_service')
-                    ->withPivot('granted_at', 'expires_at')
-                    ->withTimestamps();
+            ->withPivot('granted_at', 'expires_at')
+            ->withTimestamps();
+    }
+
+    /**
+     * Almacenes a los que este usuario tiene acceso concedido (pivote almacen_user).
+     */
+    public function almacenesConAcceso(): BelongsToMany
+    {
+        return $this->belongsToMany(\App\Models\Inventory\Almacen::class, 'almacen_user')
+            ->withPivot('granted_by')
+            ->withTimestamps();
     }
 
     /**
@@ -77,11 +89,11 @@ class User extends Authenticatable
         }
 
         return $this->services()
-                    ->where('key', $key)
-                    ->where(function ($query) {
-                        $query->whereNull('expires_at')
-                              ->orWhere('expires_at', '>', now());
-                    })
-                    ->exists();
+            ->where('key', $key)
+            ->where(function ($query) {
+                $query->whereNull('expires_at')
+                    ->orWhere('expires_at', '>', now());
+            })
+            ->exists();
     }
 }

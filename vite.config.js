@@ -9,7 +9,8 @@ export default defineConfig({
                 'resources/css/app.css',
                 'resources/js/app.js',
                 'resources/js/inventory.js',
-                'resources/js/pos.js'
+                'resources/js/pos.js',
+                'resources/js/admin.js'
             ],
             refresh: true,
         }),

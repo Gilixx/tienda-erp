@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\Auth\ResetPasswordController;
+use App\Http\Controllers\Auth\PasswordChangeController;
 use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Route;
 
@@ -37,25 +38,37 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [LoginController::class, 'destroy'])->name('logout');
 
-    // Main dashboard (all authenticated users)
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    // Cambio de contraseña obligatorio (fuera del gate password.change para evitar bucle)
+    Route::get('/cambiar-password', [PasswordChangeController::class, 'show'])->name('password.change.show');
+    Route::post('/cambiar-password', [PasswordChangeController::class, 'update'])->name('password.change.update');
 
-    // Module routes — protected by service access middleware
-    Route::middleware('service:inventory')->group(function () {
-        Route::get('/dashboard/inventory', function () {
-            return view('modules.inventory');
-        })->name('inventory');
-    });
+    // Rutas que exigen tener la contraseña actualizada
+    Route::middleware('password.change')->group(function () {
+        // Main dashboard (all authenticated users)
+        Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    // Punto de venta — pantalla completa
-    Route::middleware('service:pos')->group(function () {
-        Route::get('/dashboard/pos', function (\Illuminate\Http\Request $request) {
-            $almacenes = \App\Models\Inventory\Almacen::accesiblesPara($request->user())
-                ->orderByDesc('es_principal')
-                ->orderBy('nombre')
-                ->get(['id', 'nombre', 'codigo', 'es_principal']);
+        // Panel de administración — solo administradores
+        Route::middleware('admin')->group(function () {
+            Route::get('/dashboard/admin', fn () => view('modules.admin'))->name('admin');
+        });
 
-            return view('modules.pos', compact('almacenes'));
-        })->name('pos');
+        // Module routes — protected by service access middleware
+        Route::middleware('service:inventory')->group(function () {
+            Route::get('/dashboard/inventory', function () {
+                return view('modules.inventory');
+            })->name('inventory');
+        });
+
+        // Punto de venta — pantalla completa
+        Route::middleware('service:pos')->group(function () {
+            Route::get('/dashboard/pos', function (\Illuminate\Http\Request $request) {
+                $almacenes = \App\Models\Inventory\Almacen::accesiblesPara($request->user())
+                    ->orderByDesc('es_principal')
+                    ->orderBy('nombre')
+                    ->get(['id', 'nombre', 'codigo', 'es_principal']);
+
+                return view('modules.pos', compact('almacenes'));
+            })->name('pos');
+        });
     });
 });

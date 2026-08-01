@@ -153,4 +153,32 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::get('/stats', [\App\Http\Controllers\PosController::class, 'stats']);
     });
 
+    // ─── Panel de Administración ───────────────────────────────
+    Route::middleware('admin')->prefix('admin')->group(function () {
+        // Usuarios
+        Route::get('/users', [\App\Http\Controllers\Api\Admin\UserController::class, 'index']);
+        Route::post('/users', [\App\Http\Controllers\Api\Admin\UserController::class, 'store']);
+        Route::get('/users/{user}', [\App\Http\Controllers\Api\Admin\UserController::class, 'show']);
+        Route::match(['put', 'patch'], '/users/{user}', [\App\Http\Controllers\Api\Admin\UserController::class, 'update']);
+        Route::delete('/users/{user}', [\App\Http\Controllers\Api\Admin\UserController::class, 'destroy']);
+        Route::post('/users/{id}/restore', [\App\Http\Controllers\Api\Admin\UserController::class, 'restore']);
+        Route::patch('/users/{user}/toggle-active', [\App\Http\Controllers\Api\Admin\UserController::class, 'toggleActive']);
+        Route::post('/users/{user}/reset-password', [\App\Http\Controllers\Api\Admin\UserController::class, 'resetPassword'])
+            ->middleware('throttle:10,1');
+
+        // Acceso (servicios + almacenes) por usuario
+        Route::get('/users/{user}/access', [\App\Http\Controllers\Api\Admin\UserAccessController::class, 'show']);
+        Route::put('/users/{user}/access', [\App\Http\Controllers\Api\Admin\UserAccessController::class, 'sync']);
+
+        // Catálogo de servicios
+        Route::get('/services', [\App\Http\Controllers\Api\Admin\ServiceController::class, 'index']);
+        Route::post('/services', [\App\Http\Controllers\Api\Admin\ServiceController::class, 'store']);
+        Route::match(['put', 'patch'], '/services/{service}', [\App\Http\Controllers\Api\Admin\ServiceController::class, 'update']);
+
+        // Métricas, auditoría y exportación
+        Route::get('/stats', \App\Http\Controllers\Api\Admin\StatsController::class);
+        Route::get('/audit-logs', [\App\Http\Controllers\Api\Admin\AuditLogController::class, 'index']);
+        Route::get('/export/users', [\App\Http\Controllers\Api\Admin\ExportController::class, 'users']);
+    });
+
 });

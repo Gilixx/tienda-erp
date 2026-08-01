@@ -21,9 +21,11 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\SecurityHeaders::class,
         ]);
 
-        // Register custom service access middleware alias
+        // Register custom middleware aliases
         $middleware->alias([
             'service' => \App\Http\Middleware\CheckServiceAccess::class,
+            'admin' => \App\Http\Middleware\EnsureUserIsAdmin::class,
+            'password.change' => \App\Http\Middleware\ForcePasswordChange::class,
         ]);
 
         // Redirect unauthenticated users to login
