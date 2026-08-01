@@ -20,13 +20,30 @@
     <style>
         /* Ticket térmico — impresión */
         @media print {
+            html, body {
+                height: auto !important;
+                overflow: visible !important;
+                background: #fff !important;
+            }
             body * { visibility: hidden !important; }
-            #ticket-print, #ticket-print * { visibility: visible !important; }
+            #ticket-print, #ticket-print * {
+                visibility: visible !important;
+                color: #000 !important;
+                border-color: #000 !important;
+            }
             #ticket-print {
-                position: absolute; left: 0; top: 0;
-                width: 80mm; padding: 4mm;
+                position: fixed; left: 0; top: 0;
+                width: 80mm; padding: 4mm; margin: 0;
                 font-family: 'JetBrains Mono', monospace;
-                color: #000; background: #fff;
+                background: #fff !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            /* nombres largos se ajustan en vez de cortarse */
+            #ticket-print .truncate {
+                overflow: visible !important;
+                white-space: normal !important;
+                text-overflow: clip !important;
             }
             @page { size: 80mm auto; margin: 0; }
         }
