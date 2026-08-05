@@ -71,11 +71,11 @@ class Almacen extends Model
 
     /**
      * ¿El usuario puede ver/operar este almacén?
-     * Admins, el almacén Principal, el dueño y los usuarios con acceso concedido.
+     * Admins, el dueño y los usuarios con acceso concedido.
      */
     public function accesiblePara(User $user): bool
     {
-        if ($user->isAdmin() || $this->es_principal) {
+        if ($user->isAdmin()) {
             return true;
         }
 
@@ -94,7 +94,7 @@ class Almacen extends Model
 
     /**
      * Scope: almacenes accesibles para el usuario.
-     * Admin ve todos; el resto ve el Principal, los que creó y los concedidos.
+     * Admin ve todos; el resto ve solo los que creó y los concedidos.
      */
     public function scopeAccesiblesPara($query, User $user)
     {
@@ -103,9 +103,8 @@ class Almacen extends Model
         }
 
         return $query->where(function ($q) use ($user) {
-            $q->where('es_principal', true)
-                ->orWhere('created_by', $user->id)
-                ->orWhereIn('id', function ($sub) use ($user) {
+            $q->where('almacenes.created_by', $user->id)
+                ->orWhereIn('almacenes.id', function ($sub) use ($user) {
                     $sub->select('almacen_id')
                         ->from('almacen_user')
                         ->where('user_id', $user->id);

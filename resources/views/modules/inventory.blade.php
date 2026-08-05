@@ -34,7 +34,8 @@
                 <p id="stat-total-products" class="text-2xl font-mono font-semibold text-slate-900 dark:text-zinc-50 mt-1 tabular-nums">—</p>
             </div>
         </div>
-        <div class="bg-white dark:bg-zinc-900 border border-slate-200/70 dark:border-zinc-800 border-l-[3px] border-l-rose-500 rounded-2xl p-4 flex items-center gap-4">
+        <div id="card-low-stock" role="button" tabindex="0" title="Ver productos con stock bajo"
+            class="bg-white dark:bg-zinc-900 border border-slate-200/70 dark:border-zinc-800 border-l-[3px] border-l-rose-500 rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:shadow-md hover:border-rose-300 dark:hover:border-rose-700 transition-all">
             <div class="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center flex-shrink-0">
                 <svg class="w-5 h-5 text-rose-600 dark:text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -394,9 +395,16 @@
 
     <!-- SECTION: ALERTAS DE STOCK -->
     <div id="section-alertas" class="hidden space-y-4">
-        <div class="flex justify-between items-center">
+        <div class="flex justify-between items-center gap-3 flex-wrap">
             <h3 class="text-sm font-semibold text-slate-700 dark:text-zinc-300">Alertas de stock activas</h3>
-            <span id="alertas-count" class="bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 text-xs font-bold px-3 py-1 rounded-full">0 alertas</span>
+            <div class="flex items-center gap-3">
+                <button type="button" id="alertas-reporte-ia"
+                    class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-3 py-1.5 rounded-xl transition-all">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/></svg>
+                    Generar reporte IA
+                </button>
+                <span id="alertas-count" class="bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 text-xs font-bold px-3 py-1 rounded-full">0 alertas</span>
+            </div>
         </div>
         <div class="bg-white dark:bg-zinc-900 border border-slate-200/70 dark:border-zinc-800 rounded-2xl overflow-hidden">
             <div class="overflow-x-auto">
@@ -511,14 +519,17 @@
                 </div>
                 <p id="permisos-almacen-nombre" class="text-sm text-slate-400 dark:text-zinc-500 mb-5">—</p>
 
-                <div class="flex gap-2 mb-5">
-                    <select id="permisos-add-select"
-                        class="flex-1 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 focus:bg-white dark:focus:bg-zinc-700 focus:border-emerald-500 focus:ring-emerald-500 transition-colors text-sm py-2 px-2">
-                        <option value="">Selecciona un usuario…</option>
-                    </select>
-                    <button type="button" id="permisos-add-btn"
-                        class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-semibold text-sm transition-all flex-shrink-0">Agregar</button>
-                </div>
+                <form id="permisos-add-form" class="mb-2">
+                    <label class="block text-xs font-semibold text-slate-500 dark:text-zinc-400 mb-1.5">Conceder acceso por correo</label>
+                    <div class="flex gap-2">
+                        <input type="email" id="permisos-add-email" required placeholder="correo@ejemplo.com"
+                            class="flex-1 rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 focus:bg-white dark:focus:bg-zinc-700 focus:border-emerald-500 focus:ring-emerald-500 transition-colors text-sm py-2 px-3">
+                        <button type="submit" id="permisos-add-btn"
+                            class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-semibold text-sm transition-all flex-shrink-0">Conceder</button>
+                    </div>
+                </form>
+                <p id="permisos-add-error" class="hidden text-xs text-rose-600 dark:text-rose-400 mb-3"></p>
+                <div class="mb-4"></div>
 
                 <ul id="permisos-lista" class="space-y-2 max-h-72 overflow-y-auto">
                     <li class="text-sm text-slate-400 dark:text-zinc-500">Cargando…</li>

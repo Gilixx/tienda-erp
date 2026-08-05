@@ -8,6 +8,7 @@ use App\Models\Inventory\ProductStock;
 use App\Models\Inventory\TransferenciaAlmacen;
 use App\Models\InventoryMovement;
 use App\Models\Product;
+use App\Services\Inventory\VerificarStockService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -171,6 +172,12 @@ class TransferenciaController extends Controller
 
                 $transferencia->update(['estado' => 'en_transito']);
 
+                // Refrescar alertas del origen (stock descontado).
+                app(VerificarStockService::class)->verificar(
+                    $transferencia->almacen_origen_id,
+                    $transferencia->items->pluck('product_id')->all()
+                );
+
                 return response()->json($transferencia->fresh()->load(['almacenOrigen', 'almacenDestino', 'items.product']));
             });
         } catch (\Throwable $e) {
@@ -248,6 +255,12 @@ class TransferenciaController extends Controller
                     'fecha_recepcion' => now(),
                     'recibido_por' => auth()->id(),
                 ]);
+
+                // Refrescar alertas del destino (stock acreditado).
+                app(VerificarStockService::class)->verificar(
+                    $transferencia->almacen_destino_id,
+                    $transferencia->items->pluck('product_id')->all()
+                );
 
                 return response()->json($transferencia->fresh()->load(['almacenOrigen', 'almacenDestino', 'items.product']));
             });

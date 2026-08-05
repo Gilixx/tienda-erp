@@ -12,6 +12,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class ImportController extends Controller
 {
     private const MAX_ROWS = 5000;
+
     private const ALLOWED_MIMES = [
         'text/csv',
         'text/plain',
@@ -26,7 +27,7 @@ class ImportController extends Controller
     public function template(): StreamedResponse
     {
         $headers = ['sku', 'nombre', 'categoria', 'precio', 'costo', 'stock', 'stock_minimo', 'descripcion'];
-        $sample  = ['BEB-001', 'Coca Cola 600ml', 'Bebidas', '18.00', '12.00', '50', '5', 'Refresco 600ml'];
+        $sample = ['BEB-001', 'Coca Cola 600ml', 'Bebidas', '18.00', '12.00', '50', '5', 'Refresco 600ml'];
 
         return response()->streamDownload(function () use ($headers, $sample) {
             $out = fopen('php://output', 'w');
@@ -76,25 +77,28 @@ class ImportController extends Controller
         $headerRow = fgetcsv($handle);
         if (! $headerRow) {
             fclose($handle);
+
             return response()->json(['message' => 'CSV vacío o malformado.'], 422);
         }
 
         $headerRow = array_map(fn ($h) => strtolower(trim((string) $h)), $headerRow);
-        $required  = ['sku', 'nombre', 'precio'];
-        $missing   = array_diff($required, $headerRow);
+        $required = ['sku', 'nombre', 'precio'];
+        $missing = array_diff($required, $headerRow);
         if ($missing) {
             fclose($handle);
+
             return response()->json([
-                'message' => 'Faltan columnas requeridas: ' . implode(', ', $missing),
+                'message' => 'Faltan columnas requeridas: '.implode(', ', $missing),
             ], 422);
         }
 
         $idx = array_flip($headerRow);
+        $userId = $request->user()->id;
 
         $created = 0;
         $updated = 0;
-        $errors  = [];
-        $rowNum  = 1;
+        $errors = [];
+        $rowNum = 1;
 
         DB::beginTransaction();
         try {
@@ -104,8 +108,9 @@ class ImportController extends Controller
                 if ($rowNum - 1 > self::MAX_ROWS) {
                     fclose($handle);
                     DB::rollBack();
+
                     return response()->json([
-                        'message' => 'Excedido límite de ' . self::MAX_ROWS . ' filas.',
+                        'message' => 'Excedido límite de '.self::MAX_ROWS.' filas.',
                     ], 422);
                 }
 
@@ -114,17 +119,19 @@ class ImportController extends Controller
                     continue;
                 }
 
-                $sku    = trim((string) ($row[$idx['sku']] ?? ''));
+                $sku = trim((string) ($row[$idx['sku']] ?? ''));
                 $nombre = trim((string) ($row[$idx['nombre']] ?? ''));
                 $precio = $row[$idx['precio']] ?? null;
 
                 if ($sku === '' || $nombre === '' || ! is_numeric($precio)) {
                     $errors[] = "Fila {$rowNum}: SKU, nombre o precio inválido.";
+
                     continue;
                 }
 
                 if (mb_strlen($sku) > 100 || mb_strlen($nombre) > 255) {
                     $errors[] = "Fila {$rowNum}: longitud excedida.";
+
                     continue;
                 }
 
@@ -132,27 +139,30 @@ class ImportController extends Controller
                 if (isset($idx['categoria'])) {
                     $catName = trim((string) ($row[$idx['categoria']] ?? ''));
                     if ($catName !== '') {
-                        $catId = Category::firstOrCreate(['name' => mb_substr($catName, 0, 255)])->id;
+                        $catId = Category::firstOrCreate([
+                            'name' => mb_substr($catName, 0, 255),
+                            'created_by' => $userId,
+                        ])->id;
                     }
                 }
 
                 $data = [
                     'category_id' => $catId,
-                    'name'        => $nombre,
-                    'price'       => max(0, (float) $precio),
-                    'cost'        => isset($idx['costo'])        ? max(0, (float) ($row[$idx['costo']] ?? 0))         : 0,
-                    'stock'       => isset($idx['stock'])        ? max(0, (int)   ($row[$idx['stock']] ?? 0))         : 0,
-                    'min_stock'   => isset($idx['stock_minimo']) ? max(0, (int)   ($row[$idx['stock_minimo']] ?? 5))  : 5,
+                    'name' => $nombre,
+                    'price' => max(0, (float) $precio),
+                    'cost' => isset($idx['costo']) ? max(0, (float) ($row[$idx['costo']] ?? 0)) : 0,
+                    'stock' => isset($idx['stock']) ? max(0, (int) ($row[$idx['stock']] ?? 0)) : 0,
+                    'min_stock' => isset($idx['stock_minimo']) ? max(0, (int) ($row[$idx['stock_minimo']] ?? 5)) : 5,
                     'description' => isset($idx['descripcion']) ? mb_substr(trim((string) ($row[$idx['descripcion']] ?? '')), 0, 1000) : null,
-                    'is_active'   => true,
+                    'is_active' => true,
                 ];
 
-                $existing = Product::where('sku', $sku)->first();
+                $existing = Product::where('created_by', $userId)->where('sku', $sku)->first();
                 if ($existing) {
                     $existing->update($data);
                     $updated++;
                 } else {
-                    Product::create($data + ['sku' => $sku]);
+                    Product::create($data + ['sku' => $sku, 'created_by' => $userId]);
                     $created++;
                 }
             }
@@ -161,8 +171,9 @@ class ImportController extends Controller
         } catch (\Throwable $e) {
             DB::rollBack();
             fclose($handle);
+
             return response()->json([
-                'message' => 'Error al procesar: ' . $e->getMessage(),
+                'message' => 'Error al procesar: '.$e->getMessage(),
             ], 500);
         }
 
@@ -172,7 +183,7 @@ class ImportController extends Controller
             'message' => 'Importación completada.',
             'created' => $created,
             'updated' => $updated,
-            'errors'  => array_slice($errors, 0, 50),
+            'errors' => array_slice($errors, 0, 50),
             'error_count' => count($errors),
         ]);
     }

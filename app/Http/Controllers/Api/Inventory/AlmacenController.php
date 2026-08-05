@@ -9,6 +9,7 @@ use App\Models\Inventory\AlmacenUbicacion;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class AlmacenController extends Controller
@@ -43,7 +44,8 @@ class AlmacenController extends Controller
     {
         $validated = $request->validate([
             'nombre' => 'required|string|max:100',
-            'codigo' => 'required|string|max:20|unique:almacenes,codigo',
+            'codigo' => ['required', 'string', 'max:20',
+                Rule::unique('almacenes', 'codigo')->where('created_by', $request->user()->id)],
             'descripcion' => 'nullable|string|max:500',
             'direccion' => 'nullable|string|max:500',
             'activo' => 'boolean',
@@ -81,7 +83,10 @@ class AlmacenController extends Controller
 
         $validated = $request->validate([
             'nombre' => 'sometimes|string|max:100',
-            'codigo' => 'sometimes|string|max:20|unique:almacenes,codigo,'.$almacen->id,
+            'codigo' => ['sometimes', 'string', 'max:20',
+                Rule::unique('almacenes', 'codigo')
+                    ->where('created_by', $almacen->created_by)
+                    ->ignore($almacen->id)],
             'descripcion' => 'nullable|string|max:500',
             'direccion' => 'nullable|string|max:500',
             'activo' => 'boolean',
@@ -174,23 +179,27 @@ class AlmacenController extends Controller
         $this->authorizeGestion($almacen, $request);
 
         $validated = $request->validate([
-            'user_id' => 'required|exists:users,id',
+            'email' => 'required|email|max:255',
         ]);
 
-        if ($validated['user_id'] == $almacen->created_by) {
+        $target = User::where('email', $validated['email'])->first();
+        if (! $target) {
+            return response()->json(['error' => 'No existe un usuario con ese correo.'], 422);
+        }
+
+        if ($target->id === $almacen->created_by) {
             return response()->json(['error' => 'El dueño ya tiene acceso al almacén.'], 422);
         }
 
-        $target = User::findOrFail($validated['user_id']);
         if (! $target->hasService('inventory')) {
             return response()->json(['error' => 'El usuario no tiene acceso al módulo de inventario.'], 422);
         }
 
         $almacen->usuariosConAcceso()->syncWithoutDetaching([
-            $validated['user_id'] => ['granted_by' => $request->user()->id],
+            $target->id => ['granted_by' => $request->user()->id],
         ]);
 
-        return response()->json(['message' => 'Acceso concedido.'], 201);
+        return response()->json(['message' => 'Acceso concedido a '.$target->name.'.'], 201);
     }
 
     /** DELETE /api/inventory/almacenes/{id}/usuarios/{userId} */

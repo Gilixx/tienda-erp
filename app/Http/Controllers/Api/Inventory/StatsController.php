@@ -73,14 +73,15 @@ class StatsController extends Controller
     private function inventorySnapshot(): array
     {
         $since = Carbon::now()->subDays(30);
+        $user = auth()->user();
         $almacenIds = $this->accesibleAlmacenIds();
 
-        $totalProductos = Product::where('is_active', true)->count();
-        $stockTotal = (int) Product::where('is_active', true)->sum('stock');
-        $valorInventario = (float) Product::where('is_active', true)
+        $totalProductos = Product::accesiblesPara($user)->where('is_active', true)->count();
+        $stockTotal = (int) Product::accesiblesPara($user)->where('is_active', true)->sum('stock');
+        $valorInventario = (float) Product::accesiblesPara($user)->where('is_active', true)
             ->selectRaw('COALESCE(SUM(stock * cost), 0) as v')->value('v');
 
-        $stockBajo = Product::query()
+        $stockBajo = Product::accesiblesPara($user)
             ->where('is_active', true)
             ->whereColumn('stock', '<=', 'min_stock')
             ->orderBy('stock')
@@ -175,7 +176,7 @@ class StatsController extends Controller
     {
         $threshold = Carbon::now()->subDays(self::STALE_DAYS);
 
-        return Product::query()
+        return Product::accesiblesPara(auth()->user())
             ->select('products.id', 'products.sku', 'products.name', 'products.stock',
                 DB::raw('MAX(ventas.fecha) as ultima_venta'))
             ->leftJoin('venta_items', 'venta_items.product_id', '=', 'products.id')

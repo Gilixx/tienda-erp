@@ -181,10 +181,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ─── Stats ─────────────────────────────────────────────────
     function renderStats() {
-        const lowCount = state.products.filter(p => p.stock <= p.min_stock).length;
         if (statTotalProducts) statTotalProducts.textContent = state.products.length;
-        if (statLowStock)      statLowStock.textContent = lowCount;
         if (statCategories)    statCategories.textContent = state.categories.length;
+        // El contador de "Stock Bajo" se alimenta de la tabla de alertas
+        // (misma fuente que el tab Alertas) para que siempre coincidan.
+        refreshLowStockCounter();
+    }
+
+    // Sincroniza el contador "Stock Bajo" con las alertas activas de tipo
+    // bajo_minimo, respetando el almacén seleccionado.
+    async function refreshLowStockCounter() {
+        if (!statLowStock) return;
+        try {
+            const params = state.selectedAlmacen ? `&almacen_id=${state.selectedAlmacen}` : '';
+            const { data } = await api.get(`/api/inventory/alertas?tipo=bajo_minimo&estado=activa${params}`);
+            const total = data.total ?? (data.data ?? data).length;
+            statLowStock.textContent = total;
+        } catch { /* silencioso */ }
     }
 
     // ─── Categories filter ─────────────────────────────────────
@@ -798,8 +811,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const permisosModal      = document.getElementById('permisos-modal');
     const permisosNombre     = document.getElementById('permisos-almacen-nombre');
     const permisosLista      = document.getElementById('permisos-lista');
-    const permisosAddSelect  = document.getElementById('permisos-add-select');
+    const permisosAddForm    = document.getElementById('permisos-add-form');
+    const permisosAddEmail   = document.getElementById('permisos-add-email');
     const permisosAddBtn     = document.getElementById('permisos-add-btn');
+    const permisosAddError   = document.getElementById('permisos-add-error');
     const closePermisosBtn   = document.getElementById('close-permisos-modal');
     let permisosAlmacenId = null;
 
@@ -807,9 +822,10 @@ document.addEventListener('DOMContentLoaded', () => {
         permisosAlmacenId = id;
         permisosNombre.textContent = nombre;
         permisosLista.innerHTML = '<li class="text-sm text-slate-400 dark:text-zinc-500">Cargando…</li>';
-        permisosAddSelect.innerHTML = '<option value="">Selecciona un usuario…</option>';
+        if (permisosAddEmail) permisosAddEmail.value = '';
+        if (permisosAddError) permisosAddError.classList.add('hidden');
         showModal(permisosModal);
-        await Promise.all([cargarPermisosLista(), cargarPermisosDisponibles()]);
+        await cargarPermisosLista();
     }
 
     async function cargarPermisosLista() {
@@ -836,26 +852,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function cargarPermisosDisponibles() {
-        try {
-            const { data } = await api.get(`/api/inventory/almacenes/${permisosAlmacenId}/usuarios-disponibles`);
-            permisosAddSelect.innerHTML = '<option value="">Selecciona un usuario…</option>' +
-                data.map(u => `<option value="${u.id}">${esc(u.name)} — ${esc(u.email)}</option>`).join('');
-        } catch (err) {
-            // silencioso
-        }
-    }
-
-    permisosAddBtn?.addEventListener('click', async () => {
-        const userId = permisosAddSelect.value;
-        if (!userId) return;
+    permisosAddForm?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = permisosAddEmail.value.trim();
+        if (!email) return;
         permisosAddBtn.disabled = true;
+        if (permisosAddError) permisosAddError.classList.add('hidden');
         try {
-            await api.post(`/api/inventory/almacenes/${permisosAlmacenId}/usuarios`, { user_id: parseInt(userId) });
-            showToast('Acceso concedido.');
-            await Promise.all([cargarPermisosLista(), cargarPermisosDisponibles()]);
+            const { data } = await api.post(`/api/inventory/almacenes/${permisosAlmacenId}/usuarios`, { email });
+            showToast(data.message || 'Acceso concedido.');
+            permisosAddEmail.value = '';
+            await cargarPermisosLista();
         } catch (err) {
-            showToast(err.response?.data?.error || 'Error al conceder acceso', 'error');
+            const msg = err.response?.data?.error
+                || err.response?.data?.errors?.email?.[0]
+                || 'Error al conceder acceso';
+            if (permisosAddError) {
+                permisosAddError.textContent = msg;
+                permisosAddError.classList.remove('hidden');
+            } else {
+                showToast(msg, 'error');
+            }
         } finally {
             permisosAddBtn.disabled = false;
         }
@@ -867,7 +884,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             await api.delete(`/api/inventory/almacenes/${permisosAlmacenId}/usuarios/${userId}`);
             showToast('Acceso revocado.');
-            await Promise.all([cargarPermisosLista(), cargarPermisosDisponibles()]);
+            await cargarPermisosLista();
         } catch (err) {
             showToast(err.response?.data?.error || 'Error al revocar acceso', 'error');
         }
@@ -1201,6 +1218,13 @@ document.addEventListener('DOMContentLoaded', () => {
         btn?.addEventListener('click', () => switchTab(key));
     });
 
+    // La tarjeta "Stock Bajo" lleva al tab de Alertas.
+    const cardLowStock = document.getElementById('card-low-stock');
+    cardLowStock?.addEventListener('click', () => switchTab('alertas'));
+    cardLowStock?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchTab('alertas'); }
+    });
+
     // ─── Search ────────────────────────────────────────────────
     searchInput?.addEventListener('input', (e) => {
         state.searchQuery = e.target.value.trim();
@@ -1365,14 +1389,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return wrap;
     }
 
-    aiForm?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const message = aiInput.value.trim();
+    async function sendAiMessage(message) {
         if (!message || aiBusy) return;
 
         aiBusy = true;
-        aiSend.disabled = true;
-        aiInput.value = '';
+        if (aiSend) aiSend.disabled = true;
         appendAiMessage(message, 'user');
 
         const typing = appendAiMessage('Escribiendo…', 'bot');
@@ -1388,9 +1409,25 @@ document.addEventListener('DOMContentLoaded', () => {
             appendAiMessage(msg, 'bot');
         } finally {
             aiBusy = false;
-            aiSend.disabled = false;
-            aiInput.focus();
+            if (aiSend) aiSend.disabled = false;
+            aiInput?.focus();
         }
+    }
+
+    aiForm?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const message = aiInput.value.trim();
+        if (!message) return;
+        aiInput.value = '';
+        sendAiMessage(message);
+    });
+
+    // Reporte de stock bajo generado por IA (reusa el chatbot).
+    const alertasReporteBtn = document.getElementById('alertas-reporte-ia');
+    alertasReporteBtn?.addEventListener('click', () => {
+        if (aiBusy) return;
+        openAiPanel();
+        sendAiMessage('Genérame un reporte de los productos con stock bajo, agrupados por almacén, indicando cuánto falta para el mínimo y una recomendación de reorden para cada uno.');
     });
 
     // ─── Start ─────────────────────────────────────────────────

@@ -8,6 +8,7 @@ use App\Models\InventoryMovement;
 use App\Models\Product;
 use App\Models\Venta;
 use App\Models\VentaItem;
+use App\Services\Inventory\VerificarStockService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -51,7 +52,7 @@ class PosController extends Controller
             $this->authorizeAlmacen($almacenId);
         }
 
-        $productos = Product::query()
+        $productos = Product::accesiblesPara($request->user())
             ->where('is_active', true)
             ->where(function ($w) use ($q) {
                 $w->where('sku', 'like', "%{$q}%")
@@ -174,6 +175,12 @@ class PosController extends Controller
         } catch (HttpException $e) {
             return response()->json(['message' => $e->getMessage()], $e->getStatusCode());
         }
+
+        // Refrescar alertas de los productos vendidos en este almacén.
+        app(VerificarStockService::class)->verificar(
+            (int) $validated['almacen_id'],
+            $venta->items->pluck('product_id')->all()
+        );
 
         return response()->json(
             $venta->load(['items.product:id,name,sku', 'almacen:id,nombre,codigo', 'user:id,name']),

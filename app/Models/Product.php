@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Inventory\Almacen;
 use App\Models\Inventory\ProductStock;
 use Illuminate\Database\Eloquent\Model;
 
@@ -11,20 +12,49 @@ class Product extends Model
         'category_id', 'name', 'sku', 'description',
         'price', 'cost', 'stock', 'min_stock', 'is_active',
         'punto_reorden', 'cantidad_reorden',
-        'requiere_lote', 'requiere_serie',
+        'requiere_lote', 'requiere_serie', 'created_by',
     ];
 
     protected $casts = [
-        'price'          => 'decimal:2',
-        'cost'           => 'decimal:2',
-        'is_active'      => 'boolean',
-        'requiere_lote'  => 'boolean',
+        'price' => 'decimal:2',
+        'cost' => 'decimal:2',
+        'is_active' => 'boolean',
+        'requiere_lote' => 'boolean',
         'requiere_serie' => 'boolean',
     ];
 
     public function category()
     {
         return $this->belongsTo(Category::class);
+    }
+
+    /** Dueño del producto (cliente/tenant). */
+    public function creador()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * Scope: productos accesibles para el usuario.
+     * Admin ve todos; el resto ve los suyos y los que tienen stock en
+     * algún almacén al que tiene acceso (permite compartir por almacén).
+     */
+    public function scopeAccesiblesPara($query, User $user)
+    {
+        if ($user->isAdmin()) {
+            return $query;
+        }
+
+        $almacenIds = Almacen::accesiblesPara($user)->pluck('id');
+
+        return $query->where(function ($q) use ($user, $almacenIds) {
+            $q->where('products.created_by', $user->id)
+                ->orWhereIn('products.id', function ($sub) use ($almacenIds) {
+                    $sub->select('product_id')
+                        ->from('product_stock')
+                        ->whereIn('almacen_id', $almacenIds);
+                });
+        });
     }
 
     public function movements()

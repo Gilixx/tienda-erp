@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Inventory\ProductStock;
 use App\Models\InventoryMovement;
 use App\Models\Product;
+use App\Services\Inventory\VerificarStockService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -114,6 +115,9 @@ class MovementController extends Controller
             ]);
 
             DB::commit();
+
+            // Refrescar alertas del producto afectado en este almacén.
+            app(VerificarStockService::class)->verificar($validated['almacen_id'], [$product->id]);
 
             return response()->json(
                 $movement->load(['product:id,name,sku', 'user:id,name', 'almacen:id,nombre,codigo']),

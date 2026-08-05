@@ -19,6 +19,7 @@ class VentasDemoSeeder extends Seeder
 
         if (! $user) {
             $this->command->warn('No hay usuarios; ejecuta DatabaseSeeder primero.');
+
             return;
         }
 
@@ -28,40 +29,40 @@ class VentasDemoSeeder extends Seeder
 
         // Categorías y productos demo (crea los que falten)
         $cat = Category::firstOrCreate(
-            ['name' => 'General'],
+            ['name' => 'General', 'created_by' => $user->id],
             ['description' => 'Categoría demo']
         );
 
         $demo = [
-                ['Coca Cola 600ml', 'BEB-001', 18.00, 12.00, 120],
-                ['Sabritas Original', 'SNK-001', 22.00, 15.00, 80],
-                ['Galletas Marías', 'GAL-001', 15.00, 9.00, 60],
-                ['Pan Bimbo Grande', 'PAN-001', 55.00, 38.00, 40],
-                ['Leche Lala 1L', 'LAC-001', 28.00, 20.00, 90],
-                ['Café Nescafé 100g', 'CAF-001', 75.00, 50.00, 25],
-                ['Atún Dolores', 'ENL-001', 24.00, 16.00, 70],
-                ['Frijol Bayo 1kg', 'GRA-001', 38.00, 28.00, 35],
-                ['Aceite 1L', 'ACE-001', 45.00, 32.00, 50],
-                ['Detergente 1kg', 'LIM-001', 65.00, 45.00, 20],
-            ];
+            ['Coca Cola 600ml', 'BEB-001', 18.00, 12.00, 120],
+            ['Sabritas Original', 'SNK-001', 22.00, 15.00, 80],
+            ['Galletas Marías', 'GAL-001', 15.00, 9.00, 60],
+            ['Pan Bimbo Grande', 'PAN-001', 55.00, 38.00, 40],
+            ['Leche Lala 1L', 'LAC-001', 28.00, 20.00, 90],
+            ['Café Nescafé 100g', 'CAF-001', 75.00, 50.00, 25],
+            ['Atún Dolores', 'ENL-001', 24.00, 16.00, 70],
+            ['Frijol Bayo 1kg', 'GRA-001', 38.00, 28.00, 35],
+            ['Aceite 1L', 'ACE-001', 45.00, 32.00, 50],
+            ['Detergente 1kg', 'LIM-001', 65.00, 45.00, 20],
+        ];
 
         foreach ($demo as [$name, $sku, $price, $cost, $stock]) {
             Product::firstOrCreate(
-                ['sku' => $sku],
+                ['sku' => $sku, 'created_by' => $user->id],
                 [
                     'category_id' => $cat->id,
-                    'name'        => $name,
-                    'price'       => $price,
-                    'cost'        => $cost,
-                    'stock'       => $stock,
-                    'min_stock'   => 5,
-                    'is_active'   => true,
+                    'name' => $name,
+                    'price' => $price,
+                    'cost' => $cost,
+                    'stock' => $stock,
+                    'min_stock' => 5,
+                    'is_active' => true,
                 ]
             );
         }
 
         $products = Product::all();
-        $topIds   = $products->take(3)->pluck('id')->all();
+        $topIds = $products->take(3)->pluck('id')->all();
 
         // Generar ventas de los últimos 90 días
         for ($i = 0; $i < 90; $i++) {
@@ -70,10 +71,10 @@ class VentasDemoSeeder extends Seeder
 
             for ($v = 0; $v < $ventasDia; $v++) {
                 $venta = Venta::create([
-                    'user_id'  => $user->id,
-                    'total'    => 0,
-                    'estado'   => 'completada',
-                    'fecha'    => $fecha->copy()->setTime(rand(8, 20), rand(0, 59)),
+                    'user_id' => $user->id,
+                    'total' => 0,
+                    'estado' => 'completada',
+                    'fecha' => $fecha->copy()->setTime(rand(8, 20), rand(0, 59)),
                 ]);
 
                 $total = 0;
@@ -84,16 +85,16 @@ class VentasDemoSeeder extends Seeder
                 foreach ($picked as $producto) {
                     // Sesgo: top productos se venden más
                     $cantidad = in_array($producto->id, $topIds, true) ? rand(2, 6) : rand(1, 2);
-                    $precio   = (float) $producto->price;
+                    $precio = (float) $producto->price;
                     $subtotal = $cantidad * $precio;
-                    $total   += $subtotal;
+                    $total += $subtotal;
 
                     VentaItem::create([
-                        'venta_id'    => $venta->id,
-                        'product_id'  => $producto->id,
-                        'cantidad'    => $cantidad,
+                        'venta_id' => $venta->id,
+                        'product_id' => $producto->id,
+                        'cantidad' => $cantidad,
                         'precio_unit' => $precio,
-                        'subtotal'    => $subtotal,
+                        'subtotal' => $subtotal,
                     ]);
                 }
 
