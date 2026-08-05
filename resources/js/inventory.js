@@ -189,15 +189,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Sincroniza el contador "Stock Bajo" con las alertas activas de tipo
-    // bajo_minimo, respetando el almacén seleccionado.
-    async function refreshLowStockCounter() {
+    // bajo_minimo, respetando el almacén seleccionado. Con debounce para no
+    // disparar múltiples peticiones cuando renderStats se llama en ráfaga.
+    let lowStockTimer = null;
+    function refreshLowStockCounter() {
         if (!statLowStock) return;
-        try {
-            const params = state.selectedAlmacen ? `&almacen_id=${state.selectedAlmacen}` : '';
-            const { data } = await api.get(`/api/inventory/alertas?tipo=bajo_minimo&estado=activa${params}`);
-            const total = data.total ?? (data.data ?? data).length;
-            statLowStock.textContent = total;
-        } catch { /* silencioso */ }
+        clearTimeout(lowStockTimer);
+        lowStockTimer = setTimeout(async () => {
+            try {
+                const params = state.selectedAlmacen ? `&almacen_id=${state.selectedAlmacen}` : '';
+                const { data } = await api.get(`/api/inventory/alertas?tipo=bajo_minimo&estado=activa${params}`);
+                const total = data.total ?? (data.data ?? data).length;
+                statLowStock.textContent = total;
+            } catch { /* silencioso */ }
+        }, 400);
     }
 
     // ─── Categories filter ─────────────────────────────────────
