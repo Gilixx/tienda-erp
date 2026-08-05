@@ -268,6 +268,11 @@
                             <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Stock Mínimo <span class="text-rose-500">*</span></label>
                             <input type="number" min="0" name="min_stock" value="5" required class="{{ $inp }}">
                         </div>
+                        <div id="product-stock-inicial-wrap" class="col-span-2">
+                            <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Stock inicial en este almacén</label>
+                            <input type="number" min="0" name="stock_inicial" value="0" class="{{ $inp }}">
+                            <p class="text-xs text-slate-400 dark:text-zinc-500 mt-1">El producto se dará de alta en el almacén seleccionado. Para llevarlo a otro almacén usa una transferencia.</p>
+                        </div>
                         <div class="col-span-2">
                             <label class="block text-sm font-medium text-slate-700 dark:text-zinc-300 mb-1">Descripción</label>
                             <textarea name="description" rows="2" maxlength="1000" class="{{ $inp }}"></textarea>

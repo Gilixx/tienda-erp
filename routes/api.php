@@ -121,7 +121,6 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::delete('/almacenes/{id}', [\App\Http\Controllers\Api\Inventory\AlmacenController::class, 'destroy']);
         // Permisos de acceso por usuario (solo dueño/admin)
         Route::get('/almacenes/{id}/usuarios', [\App\Http\Controllers\Api\Inventory\AlmacenController::class, 'usuarios']);
-        Route::get('/almacenes/{id}/usuarios-disponibles', [\App\Http\Controllers\Api\Inventory\AlmacenController::class, 'usuariosDisponibles']);
         Route::post('/almacenes/{id}/usuarios', [\App\Http\Controllers\Api\Inventory\AlmacenController::class, 'agregarUsuario']);
         Route::delete('/almacenes/{id}/usuarios/{userId}', [\App\Http\Controllers\Api\Inventory\AlmacenController::class, 'quitarUsuario']);
 

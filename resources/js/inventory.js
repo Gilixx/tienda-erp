@@ -409,10 +409,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ─── Product modal ─────────────────────────────────────────
+    const stockInicialWrap = document.getElementById('product-stock-inicial-wrap');
+
     function openCreateProductModal() {
+        if (!state.selectedAlmacen) {
+            showToast('Selecciona un almacén antes de registrar un producto.', 'error');
+            return;
+        }
         state.editingProductId = null;
         productModalTitle.textContent = 'Registrar Producto';
         productForm.reset();
+        // El stock inicial solo aplica al dar de alta.
+        if (stockInicialWrap) stockInicialWrap.classList.remove('hidden');
         showModal(productModal);
     }
 
@@ -421,6 +429,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!product) return;
         state.editingProductId = id;
         productModalTitle.textContent = 'Editar Producto';
+        if (stockInicialWrap) stockInicialWrap.classList.add('hidden');
         productForm.querySelector('[name="name"]').value        = product.name;
         productForm.querySelector('[name="sku"]').value         = product.sku;
         productForm.querySelector('[name="category_id"]').value = product.category_id || '';
@@ -441,6 +450,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!data.category_id) delete data.category_id;
 
         const isEditing = !!state.editingProductId;
+        if (!isEditing) {
+            // Alta dentro del almacén seleccionado.
+            data.almacen_id = state.selectedAlmacen;
+        } else {
+            delete data.stock_inicial;
+        }
         const submitBtn = productForm.querySelector('[type="submit"]');
         submitBtn.disabled = true;
 
@@ -1304,8 +1319,14 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        if (!state.selectedAlmacen) {
+            showToast('Selecciona un almacén antes de importar.', 'error');
+            return;
+        }
+
         const fd = new FormData();
         fd.append('file', file);
+        fd.append('almacen_id', state.selectedAlmacen);
 
         importSubmitBtn.disabled = true;
         importSubmitBtn.textContent = 'Importando…';

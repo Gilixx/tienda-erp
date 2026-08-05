@@ -2,15 +2,20 @@
 
 namespace App\Http\Controllers\Api\Inventory;
 
+use App\Http\Controllers\Api\Inventory\Concerns\AuthorizesAlmacen;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
+use App\Models\Inventory\ProductStock;
 use App\Models\Product;
+use App\Services\Inventory\VerificarStockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ImportController extends Controller
 {
+    use AuthorizesAlmacen;
+
     private const MAX_ROWS = 5000;
 
     private const ALLOWED_MIMES = [
@@ -46,7 +51,8 @@ class ImportController extends Controller
      */
     public function import(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
+            'almacen_id' => 'required|integer|exists:almacenes,id',
             'file' => [
                 'required',
                 'file',
@@ -54,6 +60,10 @@ class ImportController extends Controller
                 'mimes:csv,txt',
             ],
         ]);
+
+        // Los productos se importan hacia el almacén seleccionado.
+        $this->authorizeAlmacen($validated['almacen_id']);
+        $almacenId = (int) $validated['almacen_id'];
 
         $file = $request->file('file');
 
@@ -146,12 +156,13 @@ class ImportController extends Controller
                     }
                 }
 
+                $stockCsv = isset($idx['stock']) ? max(0, (int) ($row[$idx['stock']] ?? 0)) : 0;
+
                 $data = [
                     'category_id' => $catId,
                     'name' => $nombre,
                     'price' => max(0, (float) $precio),
                     'cost' => isset($idx['costo']) ? max(0, (float) ($row[$idx['costo']] ?? 0)) : 0,
-                    'stock' => isset($idx['stock']) ? max(0, (int) ($row[$idx['stock']] ?? 0)) : 0,
                     'min_stock' => isset($idx['stock_minimo']) ? max(0, (int) ($row[$idx['stock_minimo']] ?? 5)) : 5,
                     'description' => isset($idx['descripcion']) ? mb_substr(trim((string) ($row[$idx['descripcion']] ?? '')), 0, 1000) : null,
                     'is_active' => true,
@@ -160,11 +171,20 @@ class ImportController extends Controller
                 $existing = Product::where('created_by', $userId)->where('sku', $sku)->first();
                 if ($existing) {
                     $existing->update($data);
+                    $product = $existing;
                     $updated++;
                 } else {
-                    Product::create($data + ['sku' => $sku, 'created_by' => $userId]);
+                    $product = Product::create($data + ['sku' => $sku, 'created_by' => $userId, 'stock' => 0]);
                     $created++;
                 }
+
+                // Fijar el stock en el almacén destino y sincronizar el total global.
+                $ps = ProductStock::firstOrNew(['product_id' => $product->id, 'almacen_id' => $almacenId]);
+                $ps->cantidad = $stockCsv;
+                $ps->save();
+
+                $product->stock = (int) ProductStock::where('product_id', $product->id)->sum('cantidad');
+                $product->save();
             }
 
             DB::commit();
@@ -178,6 +198,8 @@ class ImportController extends Controller
         }
 
         fclose($handle);
+
+        app(VerificarStockService::class)->verificar($almacenId);
 
         return response()->json([
             'message' => 'Importación completada.',

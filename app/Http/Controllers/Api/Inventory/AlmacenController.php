@@ -150,28 +150,6 @@ class AlmacenController extends Controller
         return response()->json($usuarios);
     }
 
-    /** GET /api/inventory/almacenes/{id}/usuarios-disponibles */
-    public function usuariosDisponibles(Request $request, string $id): JsonResponse
-    {
-        $almacen = $this->authorizeAlmacen($id);
-        $this->authorizeGestion($almacen, $request);
-
-        $excluidos = $almacen->usuariosConAcceso()->pluck('users.id')->all();
-        if ($almacen->created_by) {
-            $excluidos[] = $almacen->created_by;
-        }
-
-        // Solo usuarios con acceso vigente al módulo (admins o con el servicio inventory sin expirar)
-        $usuarios = User::query()
-            ->whereNotIn('id', $excluidos)
-            ->orderBy('name')
-            ->get(['id', 'name', 'email'])
-            ->filter(fn (User $u) => $u->hasService('inventory'))
-            ->values();
-
-        return response()->json($usuarios);
-    }
-
     /** POST /api/inventory/almacenes/{id}/usuarios */
     public function agregarUsuario(Request $request, string $id): JsonResponse
     {
