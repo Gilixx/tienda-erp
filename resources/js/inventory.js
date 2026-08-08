@@ -1214,7 +1214,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let transfProducts = state.products;
 
     function transfProductOptions() {
-        return transfProducts.map(p => `<option value="${p.id}">${esc(p.name)} (${esc(p.sku)}) — stock ${p.stock}</option>`).join('');
+        return transfProducts.map(p => {
+            const cat = p.category?.name || 'General';
+            return `<option value="${p.id}">${esc(p.name)} (${esc(p.sku)}) · ${esc(cat)} — stock ${p.stock}</option>`;
+        }).join('');
     }
 
     async function refreshTransfProducts() {
