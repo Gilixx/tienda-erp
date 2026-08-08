@@ -14,7 +14,8 @@ use Illuminate\Validation\ValidationException;
  * Reglas de negocio:
  *  - El servicio dependiente sólo puede otorgarse si el usuario tiene su requisito.
  *    (POS 'pos' requiere Inventario 'inventory').
- *  - Otorgar POS exige al menos un almacén asignado.
+ *  - Asignar almacenes es opcional: un usuario puede recibir Inventario/POS sin
+ *    almacenes compartidos y crear los suyos propios desde el módulo de inventario.
  *  - Revocar un requisito revoca en cascada los servicios que dependen de él.
  */
 class AccessManager
@@ -50,14 +51,9 @@ class AccessManager
             }
         }
 
-        // 2) POS exige al menos un almacén.
-        if ($requestedKeys->contains('pos') && empty($almacenIds)) {
-            throw ValidationException::withMessages([
-                'almacenes' => 'Debes asignar al menos un almacén para otorgar acceso a Ventas (POS).',
-            ]);
-        }
-
-        // 3) Todas las keys deben existir en el catálogo.
+        // 2) Todas las keys deben existir en el catálogo.
+        // Nota: POS ya no exige un almacén al otorgarlo. El usuario puede crear su
+        // propio almacén desde Inventario y el POS operará sobre los suyos.
         $serviciosCatalogo = Service::whereIn('key', $requestedKeys)->get()->keyBy('key');
         $desconocidas = $requestedKeys->diff($serviciosCatalogo->keys());
         if ($desconocidas->isNotEmpty()) {

@@ -107,8 +107,9 @@ class AdminPanelTest extends TestCase
             ->assertJsonValidationErrors('services');
     }
 
-    public function test_pos_sin_almacen_falla(): void
+    public function test_pos_sin_almacen_se_permite(): void
     {
+        // POS ya no exige un almacén al otorgarlo: el usuario puede crear el suyo.
         $admin = $this->admin();
         $this->seedServices();
         $target = User::factory()->create(['role' => 'user']);
@@ -121,8 +122,10 @@ class AdminPanelTest extends TestCase
                 ],
                 'almacen_ids' => [],
             ])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('almacenes');
+            ->assertOk();
+
+        $this->assertTrue($target->fresh()->hasService('pos'));
+        $this->assertTrue($target->fresh()->hasService('inventory'));
     }
 
     public function test_revocar_inventory_revoca_pos_en_cascada(): void

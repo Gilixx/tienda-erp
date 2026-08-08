@@ -261,12 +261,12 @@ if (root) {
         const { close, el } = openModal(`
             <div class="p-6">
                 <h3 class="text-base font-semibold text-slate-900 dark:text-zinc-50 mb-1">Gestionar acceso</h3>
-                <p class="text-xs text-slate-400 dark:text-zinc-500 mb-5">Ventas (POS) requiere Inventario y al menos un almacén.</p>
+                <p class="text-xs text-slate-400 dark:text-zinc-500 mb-5">Ventas (POS) requiere Inventario. Asignar almacenes es opcional: si no asignas ninguno, el usuario crea el suyo propio.</p>
 
                 <div class="space-y-2 mb-5">${serviciosHtml}</div>
 
                 <div id="almacenes-block" class="mb-5 hidden">
-                    <label class="${labelCls}">Almacenes accesibles</label>
+                    <label class="${labelCls}">Almacenes accesibles <span class="text-slate-400 font-normal">(opcional)</span></label>
                     <div class="border border-slate-200 dark:border-zinc-700 rounded-lg p-3 space-y-2 max-h-40 overflow-y-auto">${almacenesHtml}</div>
                 </div>
 
