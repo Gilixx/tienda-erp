@@ -27,28 +27,33 @@ class ProductController extends Controller
             $almacenId = $request->integer('almacen_id');
             $this->authorizeAlmacen($almacenId);
 
+            // La categoría es por almacén: se toma de product_stock.category_id.
             $query = Product::with('category')
                 ->accesiblesPara($user)
                 ->join('product_stock', function ($join) use ($almacenId) {
                     $join->on('product_stock.product_id', '=', 'products.id')
                         ->where('product_stock.almacen_id', '=', $almacenId);
                 })
-                ->select('products.*', DB::raw('product_stock.cantidad as stock'))
+                ->select(
+                    'products.*',
+                    DB::raw('product_stock.cantidad as stock'),
+                    DB::raw('product_stock.category_id as category_id')
+                )
                 ->latest('products.created_at');
+
+            if ($request->filled('category_id')) {
+                $query->where('product_stock.category_id', $request->integer('category_id'));
+            }
         } else {
-            $query = Product::with('category')->accesiblesPara($user)->latest();
+            $query = Product::accesiblesPara($user)->latest();
         }
 
         if ($request->filled('search')) {
             $search = $request->input('search');
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('sku', 'like', "%{$search}%");
+                $q->where('products.name', 'like', "%{$search}%")
+                    ->orWhere('products.sku', 'like', "%{$search}%");
             });
-        }
-
-        if ($request->filled('category_id')) {
-            $query->where('category_id', $request->integer('category_id'));
         }
 
         return response()->json($query->get());
@@ -60,7 +65,9 @@ class ProductController extends Controller
 
         $validated = $request->validate([
             'almacen_id' => 'required|integer|exists:almacenes,id',
-            'category_id' => ['nullable', Rule::exists('categories', 'id')->where('created_by', $userId)],
+            'category_id' => ['nullable', Rule::exists('categories', 'id')
+                ->where('created_by', $userId)
+                ->where('almacen_id', $request->integer('almacen_id'))],
             'name' => 'required|string|max:255',
             'sku' => ['required', 'string', 'max:100',
                 Rule::unique('products', 'sku')->where('created_by', $userId)],
@@ -77,7 +84,6 @@ class ProductController extends Controller
 
         $product = DB::transaction(function () use ($validated, $userId, $inicial) {
             $product = Product::create([
-                'category_id' => $validated['category_id'] ?? null,
                 'name' => $validated['name'],
                 'sku' => $validated['sku'],
                 'description' => $validated['description'] ?? null,
@@ -88,10 +94,12 @@ class ProductController extends Controller
                 'created_by' => $userId,
             ]);
 
+            // La categoría se guarda por almacén en product_stock.
             ProductStock::create([
                 'product_id' => $product->id,
                 'almacen_id' => $validated['almacen_id'],
                 'cantidad' => $inicial,
+                'category_id' => $validated['category_id'] ?? null,
             ]);
 
             if ($inicial > 0) {
@@ -110,8 +118,9 @@ class ProductController extends Controller
 
         app(VerificarStockService::class)->verificar((int) $validated['almacen_id'], [$product->id]);
 
-        // Devolver el stock del almacén para que el frontend lo muestre.
+        // Devolver el stock y la categoría (por almacén) para que el frontend los muestre.
         $product->stock = $inicial;
+        $product->category_id = $validated['category_id'] ?? null;
 
         return response()->json($product->load('category'), 201);
     }
@@ -131,7 +140,10 @@ class ProductController extends Controller
         $this->authorizeDueno($product, $request);
 
         $validated = $request->validate([
-            'category_id' => ['nullable', Rule::exists('categories', 'id')->where('created_by', $product->created_by)],
+            // Categoría por almacén: opcional, se aplica a product_stock del almacén dado.
+            'almacen_id' => 'nullable|integer|exists:almacenes,id',
+            'category_id' => ['nullable', Rule::exists('categories', 'id')
+                ->where('created_by', $product->created_by)],
             'name' => 'required|string|max:255',
             'sku' => ['required', 'string', 'max:100',
                 Rule::unique('products', 'sku')->where('created_by', $product->created_by)->ignore($product->id)],
@@ -142,7 +154,20 @@ class ProductController extends Controller
             'is_active' => 'boolean',
         ]);
 
-        $product->update($validated);
+        $product->update(collect($validated)->except(['almacen_id', 'category_id'])->all());
+
+        // Actualizar la categoría del producto en el almacén indicado (si se envió).
+        $categoriaAlmacen = null;
+        if (! empty($validated['almacen_id'])) {
+            $this->authorizeAlmacen($validated['almacen_id']);
+            $categoriaAlmacen = $validated['category_id'] ?? null;
+
+            ProductStock::where('product_id', $product->id)
+                ->where('almacen_id', $validated['almacen_id'])
+                ->update(['category_id' => $categoriaAlmacen]);
+        }
+
+        $product->category_id = $categoriaAlmacen;
 
         return response()->json($product->load('category'));
     }

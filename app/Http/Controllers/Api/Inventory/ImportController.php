@@ -145,6 +145,7 @@ class ImportController extends Controller
                     continue;
                 }
 
+                // La categoría es por almacén: se crea/busca en el almacén destino.
                 $catId = null;
                 if (isset($idx['categoria'])) {
                     $catName = trim((string) ($row[$idx['categoria']] ?? ''));
@@ -152,6 +153,7 @@ class ImportController extends Controller
                         $catId = Category::firstOrCreate([
                             'name' => mb_substr($catName, 0, 255),
                             'created_by' => $userId,
+                            'almacen_id' => $almacenId,
                         ])->id;
                     }
                 }
@@ -159,7 +161,6 @@ class ImportController extends Controller
                 $stockCsv = isset($idx['stock']) ? max(0, (int) ($row[$idx['stock']] ?? 0)) : 0;
 
                 $data = [
-                    'category_id' => $catId,
                     'name' => $nombre,
                     'price' => max(0, (float) $precio),
                     'cost' => isset($idx['costo']) ? max(0, (float) ($row[$idx['costo']] ?? 0)) : 0,
@@ -179,8 +180,12 @@ class ImportController extends Controller
                 }
 
                 // Fijar el stock en el almacén destino y sincronizar el total global.
+                // La categoría del CSV se guarda por almacén en product_stock.
                 $ps = ProductStock::firstOrNew(['product_id' => $product->id, 'almacen_id' => $almacenId]);
                 $ps->cantidad = $stockCsv;
+                if ($catId !== null) {
+                    $ps->category_id = $catId;
+                }
                 $ps->save();
 
                 $product->stock = (int) ProductStock::where('product_id', $product->id)->sum('cantidad');

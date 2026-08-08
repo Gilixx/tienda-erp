@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 class Product extends Model
 {
     protected $fillable = [
-        'category_id', 'name', 'sku', 'description',
+        'name', 'sku', 'description',
         'price', 'cost', 'stock', 'min_stock', 'is_active',
         'punto_reorden', 'cantidad_reorden',
         'requiere_lote', 'requiere_serie', 'created_by',
@@ -23,6 +23,11 @@ class Product extends Model
         'requiere_serie' => 'boolean',
     ];
 
+    /**
+     * Categoría del producto. Ahora la categoría es por almacén y vive en
+     * product_stock.category_id; esta relación resuelve cuando el listado
+     * expone `category_id` (alias del join con product_stock por almacén).
+     */
     public function category()
     {
         return $this->belongsTo(Category::class);

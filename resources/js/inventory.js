@@ -142,9 +142,10 @@ document.addEventListener('DOMContentLoaded', () => {
     async function init() {
         showLoading();
         try {
-            // Almacenes primero para resolver el almacén activo antes de pedir productos/movimientos
-            await Promise.all([fetchCategories(), fetchAlmacenes()]);
-            await Promise.all([fetchProducts(), fetchMovements()]);
+            // Almacenes primero para resolver el almacén activo: las categorías y
+            // el catálogo son por almacén, así que dependen de él.
+            await fetchAlmacenes();
+            await Promise.all([fetchCategories(), fetchProducts(), fetchMovements()]);
             renderStats();
             renderCategories();
             renderProducts();
@@ -169,7 +170,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function fetchCategories() {
-        const { data } = await api.get('/api/inventory/categories');
+        if (!state.selectedAlmacen) { state.categories = []; return; }
+        const { data } = await api.get(`/api/inventory/categories?almacen_id=${state.selectedAlmacen}`);
         state.categories = data;
     }
 
@@ -229,6 +231,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="pr-5 block truncate max-w-[120px]">${esc(c.name)}</span>
                     <span class="block text-xs font-normal mt-0.5 opacity-70">${c.products_count || 0}</span>
                 </button>
+                <button class="btn-manage-category absolute top-1 right-7 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg text-slate-300 hover:text-indigo-500 hover:bg-indigo-50"
+                    data-id="${c.id}" data-name="${esc(c.name)}" title="Gestionar productos de la categoría">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                </button>
                 <button class="btn-delete-category absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-50"
                     data-id="${c.id}" data-name="${esc(c.name)}" title="Eliminar categoría">
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -243,6 +249,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 state.selectedCategory = id === 'null' ? null : parseInt(id);
                 renderCategories();
                 renderProducts();
+            });
+        });
+
+        categoriesContainer.querySelectorAll('.btn-manage-category').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openCategoryManageModal(parseInt(btn.dataset.id), btn.dataset.name);
             });
         });
 
@@ -269,6 +282,107 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         });
+    }
+
+    // ─── Gestión de productos de una categoría (por almacén activo) ─────
+    function openCategoryManageModal(catId, catName) {
+        let addQuery = '';
+
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 z-[200] flex items-center justify-center p-4';
+        overlay.innerHTML = `
+            <div class="absolute inset-0 bg-slate-900/50 dark:bg-black/60 backdrop-blur-sm"></div>
+            <div class="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-lg border border-slate-100 dark:border-zinc-800 flex flex-col max-h-[85vh]">
+                <div class="flex items-start justify-between p-5 border-b border-slate-100 dark:border-zinc-800">
+                    <div class="min-w-0">
+                        <h3 class="font-semibold text-slate-800 dark:text-zinc-100 truncate">Categoría: ${esc(catName)}</h3>
+                        <p class="text-xs text-slate-400 dark:text-zinc-500 mt-0.5">Solo afecta los productos del almacén activo.</p>
+                    </div>
+                    <button id="cat-manage-close" class="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                </div>
+                <div class="p-5 overflow-y-auto space-y-5">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 dark:text-zinc-400 uppercase mb-2">En esta categoría</p>
+                        <div id="cat-assigned-list" class="space-y-1.5"></div>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 dark:text-zinc-400 uppercase mb-2">Agregar productos del almacén</p>
+                        <input id="cat-add-search" type="text" placeholder="Buscar por nombre o SKU…" class="w-full mb-2 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 text-sm py-2 px-3 focus:border-indigo-500 focus:ring-indigo-500">
+                        <div id="cat-available-list" class="space-y-1.5 max-h-52 overflow-y-auto"></div>
+                    </div>
+                </div>
+            </div>`;
+        document.body.appendChild(overlay);
+
+        const assignedList = overlay.querySelector('#cat-assigned-list');
+        const availableList = overlay.querySelector('#cat-available-list');
+        const addSearch = overlay.querySelector('#cat-add-search');
+
+        function rowHtml(p, action) {
+            const btn = action === 'add'
+                ? `<button data-add="${p.id}" class="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 flex-shrink-0">Agregar</button>`
+                : `<button data-remove="${p.id}" class="text-xs font-semibold text-rose-600 dark:text-rose-400 hover:text-rose-700 flex-shrink-0">Quitar</button>`;
+            return `<div class="flex items-center justify-between gap-3 bg-slate-50 dark:bg-zinc-800/60 rounded-lg px-3 py-2">
+                <div class="min-w-0"><p class="text-sm text-slate-800 dark:text-zinc-100 truncate">${esc(p.name)}</p><p class="text-xs font-mono text-slate-400 dark:text-zinc-500">${esc(p.sku)}</p></div>
+                ${btn}</div>`;
+        }
+
+        function rerender() {
+            const assigned = state.products.filter(p => p.category_id === catId);
+            const q = addQuery.toLowerCase();
+            const available = state.products.filter(p => p.category_id !== catId
+                && (!q || p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)));
+
+            assignedList.innerHTML = assigned.length
+                ? assigned.map(p => rowHtml(p, 'remove')).join('')
+                : '<p class="text-sm text-slate-400 dark:text-zinc-500">Ningún producto en esta categoría.</p>';
+            availableList.innerHTML = available.length
+                ? available.map(p => rowHtml(p, 'add')).join('')
+                : '<p class="text-sm text-slate-400 dark:text-zinc-500">No hay productos para agregar.</p>';
+
+            assignedList.querySelectorAll('[data-remove]').forEach(b =>
+                b.addEventListener('click', () => cambiarCategoria(parseInt(b.dataset.remove), null)));
+            availableList.querySelectorAll('[data-add]').forEach(b =>
+                b.addEventListener('click', () => cambiarCategoria(parseInt(b.dataset.add), catId)));
+        }
+
+        async function cambiarCategoria(productId, targetCatId) {
+            try {
+                if (targetCatId) {
+                    await api.post(`/api/inventory/categories/${catId}/productos`, { product_ids: [productId] });
+                } else {
+                    await api.delete(`/api/inventory/categories/${catId}/productos/${productId}`);
+                }
+                // Actualizar estado local (categoría por almacén activo).
+                const prod = state.products.find(p => p.id === productId);
+                if (prod) {
+                    const prev = prod.category_id;
+                    prod.category_id = targetCatId;
+                    prod.category = targetCatId ? { id: catId, name: catName } : null;
+                    const catActual = state.categories.find(c => c.id === catId);
+                    if (catActual) {
+                        if (targetCatId) catActual.products_count = (catActual.products_count || 0) + 1;
+                        else catActual.products_count = Math.max(0, (catActual.products_count || 0) - 1);
+                    }
+                    // Si venía de otra categoría, descontarla.
+                    if (targetCatId && prev && prev !== catId) {
+                        const catPrev = state.categories.find(c => c.id === prev);
+                        if (catPrev) catPrev.products_count = Math.max(0, (catPrev.products_count || 0) - 1);
+                    }
+                }
+                rerender();
+                renderCategories();
+                renderProducts();
+            } catch (err) {
+                showToast(err.response?.data?.message || 'Error al actualizar la categoría', 'error');
+            }
+        }
+
+        addSearch.addEventListener('input', (e) => { addQuery = e.target.value.trim(); rerender(); });
+        overlay.querySelector('#cat-manage-close').addEventListener('click', () => overlay.remove());
+        overlay.addEventListener('click', (e) => { if (e.target === overlay || e.target.classList.contains('absolute')) overlay.remove(); });
+
+        rerender();
     }
 
     // ─── Products table ────────────────────────────────────────
@@ -455,23 +569,22 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!data.category_id) delete data.category_id;
 
         const isEditing = !!state.editingProductId;
-        if (!isEditing) {
-            // Alta dentro del almacén seleccionado.
-            data.almacen_id = state.selectedAlmacen;
-        } else {
+        // La categoría se guarda por almacén, así que se envía el almacén activo.
+        data.almacen_id = state.selectedAlmacen;
+        if (isEditing) {
             delete data.stock_inicial;
         }
         const submitBtn = productForm.querySelector('[type="submit"]');
         submitBtn.disabled = true;
 
         try {
-            let res;
             if (isEditing) {
-                res = await api.put(`/api/inventory/products/${state.editingProductId}`, data);
-                const idx = state.products.findIndex(p => p.id == state.editingProductId);
-                if (idx !== -1) state.products[idx] = res.data;
+                await api.put(`/api/inventory/products/${state.editingProductId}`, data);
+                // Refrescar para reflejar stock por almacén y conteos de categoría.
+                await Promise.all([fetchProducts(), fetchCategories()]);
+                populateCategorySelects();
             } else {
-                res = await api.post('/api/inventory/products', data);
+                const res = await api.post('/api/inventory/products', data);
                 state.products.unshift(res.data);
                 if (data.category_id) {
                     const cat = state.categories.find(c => c.id == data.category_id);
@@ -497,6 +610,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ─── Category modal ────────────────────────────────────────
     addCategoryBtn.addEventListener('click', () => {
+        if (!state.selectedAlmacen) {
+            showToast('Selecciona un almacén antes de crear una categoría.', 'error');
+            return;
+        }
         categoryForm.reset();
         showModal(categoryModal);
     });
@@ -505,6 +622,7 @@ document.addEventListener('DOMContentLoaded', () => {
     categoryForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const data = Object.fromEntries(new FormData(categoryForm));
+        data.almacen_id = state.selectedAlmacen; // Las categorías son por almacén.
         const submitBtn = categoryForm.querySelector('[type="submit"]');
         submitBtn.disabled = true;
 
@@ -657,14 +775,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (state.selectedAlmacen) localStorage.setItem('inventory_almacen', state.selectedAlmacen);
         else localStorage.removeItem('inventory_almacen');
 
-        // Sincronizar selects dependientes y recargar datos del almacén activo
+        // Sincronizar selects dependientes y recargar datos del almacén activo.
+        // Las categorías son por almacén, así que también se recargan.
         populateAlmacenSelects();
+        state.selectedCategory = null;
         try {
-            await Promise.all([fetchProducts(), fetchMovements()]);
+            await Promise.all([fetchCategories(), fetchProducts(), fetchMovements()]);
             renderStats();
             renderCategories();
             renderProducts();
             renderMovements();
+            populateCategorySelects();
             fetchAndRenderAlertas().catch(() => {});
         } catch (err) {
             showToast('Error al cambiar de almacén', 'error');
@@ -971,16 +1092,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 showToast(err.response?.data?.error ?? 'Error al enviar', 'error');
             }
         } else if (action === 'recibir') {
-            const ok = await showConfirm('¿Confirmar recepción?\nSe acreditará el stock en el almacén destino.');
-            if (!ok) return;
-            try {
-                await api.post(`/api/inventory/transferencias/${id}/recibir`, { items: [] });
-                showToast('Transferencia recibida.');
-                await Promise.all([fetchAndRenderTransferencias(), fetchProducts()]);
-                renderProducts();
-            } catch (err) {
-                showToast(err.response?.data?.error ?? 'Error al recibir', 'error');
-            }
+            await openRecibirTransferenciaModal(id);
         } else if (action === 'cancelar') {
             const ok = await showConfirm('¿Cancelar esta transferencia en borrador?');
             if (!ok) return;
@@ -992,6 +1104,99 @@ document.addEventListener('DOMContentLoaded', () => {
                 showToast(err.response?.data?.error ?? 'Error al cancelar', 'error');
             }
         }
+    }
+
+    // ── Modal de recibir transferencia (decisión de categoría por producto) ──
+    async function openRecibirTransferenciaModal(id) {
+        let preview;
+        try {
+            const { data } = await api.get(`/api/inventory/transferencias/${id}/preview-categorias`);
+            preview = data;
+        } catch (err) {
+            showToast(err.response?.data?.error ?? 'Error al preparar la recepción', 'error');
+            return;
+        }
+
+        // Opciones de categoría por ítem.
+        function optionsFor(it) {
+            const opts = [];
+            if (it.categoria_destino_match) {
+                opts.push(`<option value="asignar" selected>Asignar a "${esc(it.categoria_destino_match.name)}" (existente)</option>`);
+            }
+            if (it.categoria_origen) {
+                const sel = it.categoria_destino_match ? '' : 'selected';
+                opts.push(`<option value="crear" ${sel}>Crear "${esc(it.categoria_origen.name)}" en destino</option>`);
+            }
+            const selGen = (it.categoria_destino_match || it.categoria_origen) ? '' : 'selected';
+            opts.push(`<option value="general" ${selGen}>Sin categoría (general)</option>`);
+            return opts.join('');
+        }
+
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 z-[200] flex items-center justify-center p-4';
+        overlay.innerHTML = `
+            <div class="absolute inset-0 bg-slate-900/50 dark:bg-black/60 backdrop-blur-sm"></div>
+            <div class="relative bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-xl border border-slate-100 dark:border-zinc-800 flex flex-col max-h-[85vh]">
+                <div class="flex items-start justify-between p-5 border-b border-slate-100 dark:border-zinc-800">
+                    <div>
+                        <h3 class="font-semibold text-slate-800 dark:text-zinc-100">Recibir transferencia</h3>
+                        <p class="text-xs text-slate-400 dark:text-zinc-500 mt-0.5">Se acreditará el stock en el destino. Elige la categoría de cada producto.</p>
+                    </div>
+                    <button id="recibir-close" class="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                </div>
+                <div class="p-5 overflow-y-auto space-y-2">
+                    ${preview.items.map(it => `
+                        <div class="flex items-center justify-between gap-3 bg-slate-50 dark:bg-zinc-800/60 rounded-lg px-3 py-2" data-item="${it.transferencia_item_id}" data-cantidad="${it.cantidad}" data-match="${it.categoria_destino_match?.id ?? ''}">
+                            <div class="min-w-0">
+                                <p class="text-sm text-slate-800 dark:text-zinc-100 truncate">${esc(it.product.name)} <span class="text-xs text-slate-400">× ${it.cantidad}</span></p>
+                                <p class="text-xs text-slate-400 dark:text-zinc-500">Origen: ${it.categoria_origen ? esc(it.categoria_origen.name) : 'general'}</p>
+                            </div>
+                            <select class="recibir-cat-select text-sm rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 py-1.5 px-2 focus:border-indigo-500 focus:ring-indigo-500 max-w-[55%]">
+                                ${optionsFor(it)}
+                            </select>
+                        </div>`).join('')}
+                </div>
+                <div class="flex justify-end gap-3 p-5 border-t border-slate-100 dark:border-zinc-800">
+                    <button id="recibir-cancel" class="px-4 py-2 rounded-xl border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-zinc-800 font-medium text-sm">Cancelar</button>
+                    <button id="recibir-confirm" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm">Confirmar recepción</button>
+                </div>
+            </div>`;
+        document.body.appendChild(overlay);
+
+        const close = () => overlay.remove();
+        overlay.querySelector('#recibir-close').addEventListener('click', close);
+        overlay.querySelector('#recibir-cancel').addEventListener('click', close);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay || e.target.classList.contains('absolute')) close(); });
+
+        overlay.querySelector('#recibir-confirm').addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
+            btn.disabled = true;
+            const items = Array.from(overlay.querySelectorAll('[data-item]')).map(row => {
+                const accion = row.querySelector('.recibir-cat-select').value;
+                const payload = {
+                    transferencia_item_id: parseInt(row.dataset.item),
+                    cantidad_recibida: parseInt(row.dataset.cantidad),
+                    categoria_accion: accion,
+                };
+                if (accion === 'asignar' && row.dataset.match) {
+                    payload.categoria_destino_id = parseInt(row.dataset.match);
+                }
+                return payload;
+            });
+
+            try {
+                await api.post(`/api/inventory/transferencias/${id}/recibir`, { items });
+                showToast('Transferencia recibida.');
+                close();
+                await Promise.all([fetchAndRenderTransferencias(), fetchCategories(), fetchProducts()]);
+                renderCategories();
+                renderProducts();
+                populateCategorySelects();
+            } catch (err) {
+                btn.disabled = false;
+                showToast(err.response?.data?.error ?? 'Error al recibir', 'error');
+            }
+        });
     }
 
     // ── Modal de crear transferencia ──

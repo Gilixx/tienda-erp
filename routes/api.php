@@ -27,11 +27,15 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
     // ─── Módulo de Inventarios ────────────────────────────────
     Route::middleware('service:inventory')->prefix('inventory')->group(function () {
 
-        // Categorías
+        // Categorías (por almacén)
         Route::get('/categories', [\App\Http\Controllers\Api\Inventory\CategoryController::class, 'index']);
         Route::post('/categories', [\App\Http\Controllers\Api\Inventory\CategoryController::class, 'store']);
         Route::put('/categories/{id}', [\App\Http\Controllers\Api\Inventory\CategoryController::class, 'update']);
         Route::delete('/categories/{id}', [\App\Http\Controllers\Api\Inventory\CategoryController::class, 'destroy']);
+        // Gestión de productos dentro de una categoría (almacén activo)
+        Route::get('/categories/{id}/productos', [\App\Http\Controllers\Api\Inventory\CategoryController::class, 'productos']);
+        Route::post('/categories/{id}/productos', [\App\Http\Controllers\Api\Inventory\CategoryController::class, 'agregarProductos']);
+        Route::delete('/categories/{id}/productos/{productId}', [\App\Http\Controllers\Api\Inventory\CategoryController::class, 'quitarProducto']);
 
         // Productos
         Route::apiResource('products', \App\Http\Controllers\Api\Inventory\ProductController::class);
@@ -133,6 +137,7 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function () {
         Route::post('/transferencias', [\App\Http\Controllers\Api\Inventory\TransferenciaController::class, 'store'])
             ->middleware('throttle:30,1');
         Route::get('/transferencias/{id}', [\App\Http\Controllers\Api\Inventory\TransferenciaController::class, 'show']);
+        Route::get('/transferencias/{id}/preview-categorias', [\App\Http\Controllers\Api\Inventory\TransferenciaController::class, 'previewCategorias']);
         Route::post('/transferencias/{id}/enviar', [\App\Http\Controllers\Api\Inventory\TransferenciaController::class, 'enviar'])
             ->middleware('throttle:30,1');
         Route::post('/transferencias/{id}/recibir', [\App\Http\Controllers\Api\Inventory\TransferenciaController::class, 'recibir'])

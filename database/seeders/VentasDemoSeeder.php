@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\Category;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Venta;
@@ -27,12 +26,8 @@ class VentasDemoSeeder extends Seeder
         VentaItem::query()->delete();
         Venta::query()->delete();
 
-        // Categorías y productos demo (crea los que falten)
-        $cat = Category::firstOrCreate(
-            ['name' => 'General', 'created_by' => $user->id],
-            ['description' => 'Categoría demo']
-        );
-
+        // Productos demo (crea los que falten). La categoría es por almacén y
+        // se gestiona desde el módulo de inventario, no en este seeder de ventas.
         $demo = [
             ['Coca Cola 600ml', 'BEB-001', 18.00, 12.00, 120],
             ['Sabritas Original', 'SNK-001', 22.00, 15.00, 80],
@@ -50,7 +45,6 @@ class VentasDemoSeeder extends Seeder
             Product::firstOrCreate(
                 ['sku' => $sku, 'created_by' => $user->id],
                 [
-                    'category_id' => $cat->id,
                     'name' => $name,
                     'price' => $price,
                     'cost' => $cost,

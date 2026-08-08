@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Inventory;
 
 use App\Http\Controllers\Api\Inventory\Concerns\AuthorizesAlmacen;
 use App\Http\Controllers\Controller;
+use App\Models\Category;
 use App\Models\Inventory\ProductStock;
 use App\Models\Inventory\TransferenciaAlmacen;
 use App\Models\InventoryMovement;
@@ -52,6 +53,57 @@ class TransferenciaController extends Controller
         $perPage = min(100, max(10, $request->integer('per_page', 25)));
 
         return response()->json($query->paginate($perPage));
+    }
+
+    /**
+     * GET /api/inventory/transferencias/{id}/preview-categorias
+     * Por cada producto: su categoría en el origen, la categoría del destino con
+     * el mismo nombre (si existe) y su categoría actual en el destino.
+     * Sirve para armar el diálogo de categorías al recibir.
+     */
+    public function previewCategorias(string $id): JsonResponse
+    {
+        $t = TransferenciaAlmacen::with('items.product:id,name,sku')->findOrFail($id);
+        $this->authorizeAlmacen($t->almacen_origen_id);
+        $this->authorizeAlmacen($t->almacen_destino_id);
+
+        $items = $t->items->map(function ($item) use ($t) {
+            $catOrigen = ProductStock::with('category:id,name,description,created_by')
+                ->where('product_id', $item->product_id)
+                ->where('almacen_id', $t->almacen_origen_id)
+                ->first()?->category;
+
+            $match = null;
+            if ($catOrigen) {
+                $match = Category::where('created_by', $catOrigen->created_by)
+                    ->where('almacen_id', $t->almacen_destino_id)
+                    ->where('name', $catOrigen->name)
+                    ->first(['id', 'name']);
+            }
+
+            $destinoActual = ProductStock::with('category:id,name')
+                ->where('product_id', $item->product_id)
+                ->where('almacen_id', $t->almacen_destino_id)
+                ->first()?->category;
+
+            return [
+                'transferencia_item_id' => $item->id,
+                'cantidad' => $item->cantidad,
+                'product' => [
+                    'id' => $item->product_id,
+                    'name' => $item->product->name ?? '',
+                    'sku' => $item->product->sku ?? '',
+                ],
+                'categoria_origen' => $catOrigen ? ['id' => $catOrigen->id, 'name' => $catOrigen->name] : null,
+                'categoria_destino_match' => $match ? ['id' => $match->id, 'name' => $match->name] : null,
+                'categoria_destino_actual' => $destinoActual ? ['id' => $destinoActual->id, 'name' => $destinoActual->name] : null,
+            ];
+        });
+
+        return response()->json([
+            'almacen_destino_id' => $t->almacen_destino_id,
+            'items' => $items,
+        ]);
     }
 
     /** GET /api/inventory/transferencias/{id} */
@@ -197,6 +249,9 @@ class TransferenciaController extends Controller
             'items' => 'nullable|array',
             'items.*.transferencia_item_id' => 'required|integer',
             'items.*.cantidad_recibida' => 'required|integer|min:0',
+            // Acción de categoría por ítem: general | asignar | crear.
+            'items.*.categoria_accion' => 'nullable|in:general,asignar,crear',
+            'items.*.categoria_destino_id' => 'nullable|integer',
         ]);
 
         try {
@@ -212,10 +267,17 @@ class TransferenciaController extends Controller
                     return response()->json(['error' => 'Solo se pueden recibir transferencias en tránsito.'], 422);
                 }
 
-                // Mapa de cantidades recibidas (si el usuario las especificó)
+                // Mapas por ítem: cantidad recibida y acción de categoría.
                 $recibidas = [];
+                $accionesCat = [];
                 foreach ($validated['items'] ?? [] as $row) {
                     $recibidas[$row['transferencia_item_id']] = $row['cantidad_recibida'];
+                    if (isset($row['categoria_accion'])) {
+                        $accionesCat[$row['transferencia_item_id']] = [
+                            'accion' => $row['categoria_accion'],
+                            'categoria_destino_id' => $row['categoria_destino_id'] ?? null,
+                        ];
+                    }
                 }
 
                 foreach ($transferencia->items as $item) {
@@ -233,6 +295,11 @@ class TransferenciaController extends Controller
                     );
                     $stockDestino->increment('cantidad', $cantidadRecibida);
                     $stockDestino->touch();
+
+                    // Aplicar la categoría en destino solo si se envió una acción explícita.
+                    if (isset($accionesCat[$item->id])) {
+                        $this->aplicarCategoriaDestino($transferencia, $item, $stockDestino, $accionesCat[$item->id]);
+                    }
 
                     // Mantener products.stock en sincronía (total global)
                     Product::where('id', $item->product_id)
@@ -269,6 +336,48 @@ class TransferenciaController extends Controller
 
             return response()->json(['error' => 'Error al recibir la transferencia: '.$e->getMessage()], 500);
         }
+    }
+
+    /**
+     * Aplica la categoría del producto en el almacén destino según la acción elegida:
+     *  - general: sin categoría (NULL).
+     *  - asignar: usa una categoría existente del destino (validada).
+     *  - crear:   crea (o reutiliza) en el destino la categoría que trae del origen.
+     */
+    private function aplicarCategoriaDestino(TransferenciaAlmacen $t, $item, ProductStock $stockDestino, array $accion): void
+    {
+        $catDestinoId = null;
+
+        if ($accion['accion'] === 'asignar' && $accion['categoria_destino_id']) {
+            $cat = Category::where('id', $accion['categoria_destino_id'])
+                ->where('almacen_id', $t->almacen_destino_id)
+                ->first();
+            if (! $cat) {
+                return; // categoría inválida: no tocar lo existente
+            }
+            $catDestinoId = $cat->id;
+        } elseif ($accion['accion'] === 'crear') {
+            $catOrigen = ProductStock::with('category')
+                ->where('product_id', $item->product_id)
+                ->where('almacen_id', $t->almacen_origen_id)
+                ->first()?->category;
+            if (! $catOrigen) {
+                return;
+            }
+            $nueva = Category::firstOrCreate(
+                [
+                    'created_by' => $catOrigen->created_by,
+                    'almacen_id' => $t->almacen_destino_id,
+                    'name' => $catOrigen->name,
+                ],
+                ['description' => $catOrigen->description]
+            );
+            $catDestinoId = $nueva->id;
+        }
+
+        // 'general' => queda en NULL.
+        $stockDestino->category_id = $catDestinoId;
+        $stockDestino->save();
     }
 
     /** DELETE /api/inventory/transferencias/{id} — solo borradores */
