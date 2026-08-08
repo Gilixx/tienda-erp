@@ -20,9 +20,10 @@ class CategoryController extends Controller
         $almacenId = $request->integer('almacen_id');
         $this->authorizeAlmacen($almacenId);
 
+        // Cualquier usuario con acceso al almacén ve TODAS sus categorías, sin
+        // importar quién las creó (los almacenes se comparten entre usuarios).
         return response()->json(
-            Category::accesiblesPara($request->user())
-                ->where('almacen_id', $almacenId)
+            Category::where('almacen_id', $almacenId)
                 ->withCount('stocks as products_count')
                 ->orderBy('name')
                 ->get()
@@ -41,7 +42,7 @@ class CategoryController extends Controller
         ]);
 
         $this->authorizeAlmacen($validated['almacen_id']);
-        $this->assertNombreUnico($validated['name'], $userId, $validated['almacen_id']);
+        $this->assertNombreUnico($validated['name'], $validated['almacen_id']);
 
         $category = Category::create([
             'name' => $validated['name'],
@@ -58,14 +59,14 @@ class CategoryController extends Controller
     public function update(Request $request, string $id)
     {
         $category = Category::findOrFail($id);
-        $this->authorizeDueno($category, $request);
+        $this->authorizeAlmacen($category->almacen_id);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'description' => 'nullable|string|max:1000',
         ]);
 
-        $this->assertNombreUnico($validated['name'], $category->created_by, $category->almacen_id, $category->id);
+        $this->assertNombreUnico($validated['name'], $category->almacen_id, $category->id);
         $category->update($validated);
 
         return response()->json($category->loadCount('stocks as products_count'));
@@ -75,7 +76,7 @@ class CategoryController extends Controller
     public function destroy(Request $request, string $id)
     {
         $category = Category::findOrFail($id);
-        $this->authorizeDueno($category, $request);
+        $this->authorizeAlmacen($category->almacen_id);
         $category->delete();
 
         return response()->json(['message' => 'Categoría eliminada correctamente']);
@@ -88,7 +89,7 @@ class CategoryController extends Controller
     public function productos(Request $request, string $id)
     {
         $category = Category::findOrFail($id);
-        $this->authorizeDueno($category, $request);
+        $this->authorizeAlmacen($category->almacen_id);
 
         $productos = Product::query()
             ->join('product_stock', 'product_stock.product_id', '=', 'products.id')
@@ -107,7 +108,7 @@ class CategoryController extends Controller
     public function agregarProductos(Request $request, string $id)
     {
         $category = Category::findOrFail($id);
-        $this->authorizeDueno($category, $request);
+        $this->authorizeAlmacen($category->almacen_id);
 
         $validated = $request->validate([
             'product_ids' => 'required|array|min:1',
@@ -132,7 +133,7 @@ class CategoryController extends Controller
     public function quitarProducto(Request $request, string $id, string $productId)
     {
         $category = Category::findOrFail($id);
-        $this->authorizeDueno($category, $request);
+        $this->authorizeAlmacen($category->almacen_id);
 
         ProductStock::where('almacen_id', $category->almacen_id)
             ->where('product_id', $productId)
@@ -142,11 +143,10 @@ class CategoryController extends Controller
         return response()->json(['message' => 'Producto movido a general.']);
     }
 
-    /** Aborta con 409 si ya existe otra categoría con ese nombre en el almacén. */
-    private function assertNombreUnico(string $name, int $ownerId, int $almacenId, ?int $ignoreId = null): void
+    /** Aborta con 422 si ya existe otra categoría con ese nombre en el almacén. */
+    private function assertNombreUnico(string $name, int $almacenId, ?int $ignoreId = null): void
     {
-        $exists = Category::where('created_by', $ownerId)
-            ->where('almacen_id', $almacenId)
+        $exists = Category::where('almacen_id', $almacenId)
             ->where('name', $name)
             ->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))
             ->exists();
@@ -156,15 +156,6 @@ class CategoryController extends Controller
                 'message' => 'Ya existe una categoría con ese nombre en este almacén.',
                 'errors' => ['name' => ['Ya existe una categoría con ese nombre en este almacén.']],
             ], 422));
-        }
-    }
-
-    /** Aborta con 403 si el usuario no es dueño de la categoría (ni admin). */
-    private function authorizeDueno(Category $category, Request $request): void
-    {
-        $user = $request->user();
-        if (! $user->isAdmin() && $category->created_by !== $user->id) {
-            abort(403, 'Solo el dueño de la categoría puede modificarla.');
         }
     }
 }

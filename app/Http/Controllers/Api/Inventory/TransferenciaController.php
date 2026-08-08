@@ -75,8 +75,8 @@ class TransferenciaController extends Controller
 
             $match = null;
             if ($catOrigen) {
-                $match = Category::where('created_by', $catOrigen->created_by)
-                    ->where('almacen_id', $t->almacen_destino_id)
+                // Coincidencia por nombre dentro del almacén destino (sin importar creador).
+                $match = Category::where('almacen_id', $t->almacen_destino_id)
                     ->where('name', $catOrigen->name)
                     ->first(['id', 'name']);
             }
@@ -364,13 +364,16 @@ class TransferenciaController extends Controller
             if (! $catOrigen) {
                 return;
             }
+            // Identidad de categoría por (almacén, nombre); reutiliza si ya existe.
             $nueva = Category::firstOrCreate(
                 [
-                    'created_by' => $catOrigen->created_by,
                     'almacen_id' => $t->almacen_destino_id,
                     'name' => $catOrigen->name,
                 ],
-                ['description' => $catOrigen->description]
+                [
+                    'description' => $catOrigen->description,
+                    'created_by' => $catOrigen->created_by,
+                ]
             );
             $catDestinoId = $nueva->id;
         }

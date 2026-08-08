@@ -22,22 +22,9 @@ class Category extends Model
         return $this->belongsTo(Almacen::class);
     }
 
-    /** Dueño de la categoría (cliente/tenant). */
+    /** Creador de la categoría (registro; la visibilidad va por acceso al almacén). */
     public function creador()
     {
         return $this->belongsTo(User::class, 'created_by');
-    }
-
-    /**
-     * Scope: categorías accesibles para el usuario.
-     * Admin ve todas; el resto solo las suyas.
-     */
-    public function scopeAccesiblesPara($query, User $user)
-    {
-        if ($user->isAdmin()) {
-            return $query;
-        }
-
-        return $query->where('categories.created_by', $user->id);
     }
 }

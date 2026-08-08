@@ -150,11 +150,11 @@ class ImportController extends Controller
                 if (isset($idx['categoria'])) {
                     $catName = trim((string) ($row[$idx['categoria']] ?? ''));
                     if ($catName !== '') {
-                        $catId = Category::firstOrCreate([
-                            'name' => mb_substr($catName, 0, 255),
-                            'created_by' => $userId,
-                            'almacen_id' => $almacenId,
-                        ])->id;
+                        // Identidad por (almacén, nombre); reutiliza la existente.
+                        $catId = Category::firstOrCreate(
+                            ['almacen_id' => $almacenId, 'name' => mb_substr($catName, 0, 255)],
+                            ['created_by' => $userId],
+                        )->id;
                     }
                 }
 

@@ -7,6 +7,7 @@ use App\Models\Inventory\Almacen;
 use App\Models\Inventory\ProductStock;
 use App\Models\Inventory\TransferenciaAlmacen;
 use App\Models\Product;
+use App\Models\Service;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -240,6 +241,53 @@ class CategoriasPorAlmacenTest extends TestCase
             'product_id' => $prod->id, 'almacen_id' => $this->almB->id, 'category_id' => null,
         ]);
         $this->assertEquals(0, Category::where('almacen_id', $this->almB->id)->count());
+    }
+
+    public function test_usuario_con_acceso_compartido_ve_categorias_aunque_no_las_creo(): void
+    {
+        // El almacén y la categoría los crea el dueño (otro usuario).
+        $owner = User::factory()->create(['role' => 'user']);
+        $almacen = Almacen::create([
+            'nombre' => 'Compartido', 'codigo' => 'CMP-1',
+            'es_principal' => false, 'activo' => true, 'created_by' => $owner->id,
+        ]);
+        Category::create(['name' => 'Lacteos', 'created_by' => $owner->id, 'almacen_id' => $almacen->id]);
+
+        // Usuario invitado: servicio inventory + acceso compartido al almacén.
+        $invitado = $this->usuarioConInventario();
+        $almacen->usuariosConAcceso()->attach($invitado->id, ['granted_by' => $owner->id]);
+
+        $this->actingAs($invitado)
+            ->getJson('/api/inventory/categories?almacen_id='.$almacen->id)
+            ->assertOk()
+            ->assertJsonCount(1)
+            ->assertJsonFragment(['name' => 'Lacteos']);
+    }
+
+    public function test_usuario_sin_acceso_al_almacen_no_ve_sus_categorias(): void
+    {
+        $owner = User::factory()->create(['role' => 'user']);
+        $almacen = Almacen::create([
+            'nombre' => 'Privado', 'codigo' => 'PRV-1',
+            'es_principal' => false, 'activo' => true, 'created_by' => $owner->id,
+        ]);
+        Category::create(['name' => 'Lacteos', 'created_by' => $owner->id, 'almacen_id' => $almacen->id]);
+
+        $extrano = $this->usuarioConInventario();
+
+        $this->actingAs($extrano)
+            ->getJson('/api/inventory/categories?almacen_id='.$almacen->id)
+            ->assertStatus(403);
+    }
+
+    /** Usuario no-admin con el servicio de inventario concedido. */
+    private function usuarioConInventario(): User
+    {
+        $user = User::factory()->create(['role' => 'user', 'is_active' => true]);
+        $inventory = Service::firstOrCreate(['key' => 'inventory'], ['name' => 'Inventario']);
+        $user->services()->attach($inventory->id, ['granted_at' => now()]);
+
+        return $user;
     }
 
     /** Crea una transferencia A→B en tránsito con un ítem del producto dado. */
