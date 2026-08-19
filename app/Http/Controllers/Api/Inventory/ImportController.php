@@ -105,106 +105,176 @@ class ImportController extends Controller
         $idx = array_flip($headerRow);
         $userId = $request->user()->id;
 
-        $created = 0;
-        $updated = 0;
+        // ── 1) Parsear y validar TODAS las filas en memoria (sin tocar la BD) ──
         $errors = [];
         $rowNum = 1;
+        $rows = []; // sku => datos (última fila con el mismo SKU gana)
+
+        while (($row = fgetcsv($handle)) !== false) {
+            $rowNum++;
+
+            if ($rowNum - 1 > self::MAX_ROWS) {
+                fclose($handle);
+
+                return response()->json([
+                    'message' => 'Excedido límite de '.self::MAX_ROWS.' filas.',
+                ], 422);
+            }
+
+            // Saltar filas vacías
+            if (count(array_filter($row, fn ($v) => trim((string) $v) !== '')) === 0) {
+                continue;
+            }
+
+            $sku = trim((string) ($row[$idx['sku']] ?? ''));
+            $nombre = trim((string) ($row[$idx['nombre']] ?? ''));
+            $precio = $row[$idx['precio']] ?? null;
+
+            if ($sku === '' || $nombre === '' || ! is_numeric($precio)) {
+                $errors[] = "Fila {$rowNum}: SKU, nombre o precio inválido.";
+
+                continue;
+            }
+
+            if (mb_strlen($sku) > 100 || mb_strlen($nombre) > 255) {
+                $errors[] = "Fila {$rowNum}: longitud excedida.";
+
+                continue;
+            }
+
+            $catName = '';
+            if (isset($idx['categoria'])) {
+                $catName = mb_substr(trim((string) ($row[$idx['categoria']] ?? '')), 0, 255);
+            }
+
+            $rows[$sku] = [
+                'sku' => $sku,
+                'name' => $nombre,
+                'price' => max(0, (float) $precio),
+                'cost' => isset($idx['costo']) ? max(0, (float) ($row[$idx['costo']] ?? 0)) : 0,
+                'min_stock' => isset($idx['stock_minimo']) ? max(0, (int) ($row[$idx['stock_minimo']] ?? 5)) : 5,
+                'description' => isset($idx['descripcion']) ? mb_substr(trim((string) ($row[$idx['descripcion']] ?? '')), 0, 1000) : null,
+                'stock' => isset($idx['stock']) ? max(0, (int) ($row[$idx['stock']] ?? 0)) : 0,
+                'cat' => $catName !== '' ? $catName : null,
+            ];
+        }
+        fclose($handle);
+
+        $rows = array_values($rows);
+
+        if (empty($rows)) {
+            return response()->json([
+                'message' => 'Importación completada.',
+                'created' => 0, 'updated' => 0,
+                'errors' => array_slice($errors, 0, 50), 'error_count' => count($errors),
+            ]);
+        }
+
+        $now = now();
+        $created = 0;
+        $updated = 0;
+        $touched = [];
 
         DB::beginTransaction();
         try {
-            while (($row = fgetcsv($handle)) !== false) {
-                $rowNum++;
+            // ── 2) Categorías del almacén: buscar existentes e insertar faltantes en bloque ──
+            $catNames = collect($rows)->pluck('cat')->filter()->unique()->values();
+            $catMap = [];
+            if ($catNames->isNotEmpty()) {
+                $catMap = Category::where('almacen_id', $almacenId)
+                    ->whereIn('name', $catNames)->pluck('id', 'name')->all();
 
-                if ($rowNum - 1 > self::MAX_ROWS) {
-                    fclose($handle);
-                    DB::rollBack();
+                $faltantes = $catNames->reject(fn ($n) => isset($catMap[$n]))->values();
+                if ($faltantes->isNotEmpty()) {
+                    Category::insert($faltantes->map(fn ($n) => [
+                        'name' => $n, 'almacen_id' => $almacenId, 'created_by' => $userId,
+                        'created_at' => $now, 'updated_at' => $now,
+                    ])->all());
 
-                    return response()->json([
-                        'message' => 'Excedido límite de '.self::MAX_ROWS.' filas.',
-                    ], 422);
+                    $catMap = Category::where('almacen_id', $almacenId)
+                        ->whereIn('name', $catNames)->pluck('id', 'name')->all();
                 }
+            }
 
-                // Saltar filas vacías
-                if (count(array_filter($row, fn ($v) => trim((string) $v) !== '')) === 0) {
-                    continue;
-                }
+            // ── 3) Productos: upsert en bloque por (created_by, sku) ──
+            $skus = array_column($rows, 'sku');
+            $existentes = Product::where('created_by', $userId)->whereIn('sku', $skus)->pluck('id', 'sku');
 
-                $sku = trim((string) ($row[$idx['sku']] ?? ''));
-                $nombre = trim((string) ($row[$idx['nombre']] ?? ''));
-                $precio = $row[$idx['precio']] ?? null;
-
-                if ($sku === '' || $nombre === '' || ! is_numeric($precio)) {
-                    $errors[] = "Fila {$rowNum}: SKU, nombre o precio inválido.";
-
-                    continue;
-                }
-
-                if (mb_strlen($sku) > 100 || mb_strlen($nombre) > 255) {
-                    $errors[] = "Fila {$rowNum}: longitud excedida.";
-
-                    continue;
-                }
-
-                // La categoría es por almacén: se crea/busca en el almacén destino.
-                $catId = null;
-                if (isset($idx['categoria'])) {
-                    $catName = trim((string) ($row[$idx['categoria']] ?? ''));
-                    if ($catName !== '') {
-                        // Identidad por (almacén, nombre); reutiliza la existente.
-                        $catId = Category::firstOrCreate(
-                            ['almacen_id' => $almacenId, 'name' => mb_substr($catName, 0, 255)],
-                            ['created_by' => $userId],
-                        )->id;
-                    }
-                }
-
-                $stockCsv = isset($idx['stock']) ? max(0, (int) ($row[$idx['stock']] ?? 0)) : 0;
-
-                $data = [
-                    'name' => $nombre,
-                    'price' => max(0, (float) $precio),
-                    'cost' => isset($idx['costo']) ? max(0, (float) ($row[$idx['costo']] ?? 0)) : 0,
-                    'min_stock' => isset($idx['stock_minimo']) ? max(0, (int) ($row[$idx['stock_minimo']] ?? 5)) : 5,
-                    'description' => isset($idx['descripcion']) ? mb_substr(trim((string) ($row[$idx['descripcion']] ?? '')), 0, 1000) : null,
-                    'is_active' => true,
+            $prodUpsert = [];
+            foreach ($rows as $r) {
+                $existentes->has($r['sku']) ? $updated++ : $created++;
+                $prodUpsert[] = [
+                    'sku' => $r['sku'], 'created_by' => $userId,
+                    'name' => $r['name'], 'price' => $r['price'], 'cost' => $r['cost'],
+                    'min_stock' => $r['min_stock'], 'description' => $r['description'], 'is_active' => true,
+                    'stock' => 0, 'created_at' => $now, 'updated_at' => $now,
                 ];
+            }
+            foreach (array_chunk($prodUpsert, 500) as $chunk) {
+                // 'stock' se excluye del update: se recalcula abajo desde product_stock.
+                Product::upsert($chunk, ['created_by', 'sku'],
+                    ['name', 'price', 'cost', 'min_stock', 'description', 'is_active', 'updated_at']);
+            }
 
-                $existing = Product::where('created_by', $userId)->where('sku', $sku)->first();
-                if ($existing) {
-                    $existing->update($data);
-                    $product = $existing;
-                    $updated++;
+            // IDs finales por SKU (existentes + recién creados).
+            $prodMap = Product::where('created_by', $userId)->whereIn('sku', $skus)->pluck('id', 'sku');
+
+            // ── 4) Stock por almacén: upsert en bloque (separando con/sin categoría) ──
+            $conCat = [];
+            $sinCat = [];
+            foreach ($rows as $r) {
+                $pid = $prodMap[$r['sku']];
+                $touched[] = $pid;
+                if ($r['cat'] !== null && isset($catMap[$r['cat']])) {
+                    $conCat[] = ['product_id' => $pid, 'almacen_id' => $almacenId, 'cantidad' => $r['stock'], 'category_id' => $catMap[$r['cat']], 'updated_at' => $now];
                 } else {
-                    $product = Product::create($data + ['sku' => $sku, 'created_by' => $userId, 'stock' => 0]);
-                    $created++;
+                    $sinCat[] = ['product_id' => $pid, 'almacen_id' => $almacenId, 'cantidad' => $r['stock'], 'updated_at' => $now];
                 }
+            }
+            foreach (array_chunk($conCat, 500) as $chunk) {
+                ProductStock::upsert($chunk, ['product_id', 'almacen_id'], ['cantidad', 'category_id', 'updated_at']);
+            }
+            // Sin categoría: no se toca category_id de filas existentes.
+            foreach (array_chunk($sinCat, 500) as $chunk) {
+                ProductStock::upsert($chunk, ['product_id', 'almacen_id'], ['cantidad', 'updated_at']);
+            }
 
-                // Fijar el stock en el almacén destino y sincronizar el total global.
-                // La categoría del CSV se guarda por almacén en product_stock.
-                $ps = ProductStock::firstOrNew(['product_id' => $product->id, 'almacen_id' => $almacenId]);
-                $ps->cantidad = $stockCsv;
-                if ($catId !== null) {
-                    $ps->category_id = $catId;
+            // ── 5) Sincronizar products.stock (total global): una lectura agregada +
+            //     un UPDATE ... CASE por lote (evita un UPDATE por producto). ──
+            $sumas = ProductStock::whereIn('product_id', $touched)
+                ->groupBy('product_id')
+                ->selectRaw('product_id, SUM(cantidad) as total')
+                ->pluck('total', 'product_id')
+                ->all();
+
+            foreach (array_chunk($sumas, 200, true) as $lote) {
+                $cases = '';
+                $bindings = [];
+                foreach ($lote as $pid => $total) {
+                    $cases .= ' WHEN ? THEN ?';
+                    $bindings[] = $pid;
+                    $bindings[] = (int) $total;
                 }
-                $ps->save();
+                $ids = array_keys($lote);
+                $in = implode(',', array_fill(0, count($ids), '?'));
 
-                $product->stock = (int) ProductStock::where('product_id', $product->id)->sum('cantidad');
-                $product->save();
+                DB::update(
+                    "UPDATE products SET stock = CASE id{$cases} END WHERE id IN ({$in})",
+                    array_merge($bindings, $ids)
+                );
             }
 
             DB::commit();
         } catch (\Throwable $e) {
             DB::rollBack();
-            fclose($handle);
 
             return response()->json([
                 'message' => 'Error al procesar: '.$e->getMessage(),
             ], 500);
         }
 
-        fclose($handle);
-
-        app(VerificarStockService::class)->verificar($almacenId);
+        // Refresco de alertas acotado a los productos tocados (no rescan del almacén).
+        app(VerificarStockService::class)->verificar($almacenId, $touched);
 
         return response()->json([
             'message' => 'Importación completada.',
