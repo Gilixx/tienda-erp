@@ -18,21 +18,28 @@ class CheckServiceAccess
     {
         $user = $request->user();
 
-        if (!$user) {
-            return redirect()->route('login');
+        if (! $user) {
+            return $request->expectsJson()
+                ? response()->json(['message' => 'No autenticado.'], 401)
+                : redirect()->route('login');
         }
 
-        if (!$user->is_active) {
+        if (! $user->is_active) {
             auth()->logout();
-            return redirect()->route('login')->withErrors([
-                'email' => 'Tu cuenta está desactivada. Contacta al administrador.',
-            ]);
+
+            return $request->expectsJson()
+                ? response()->json(['message' => 'Cuenta desactivada.'], 403)
+                : redirect()->route('login')->withErrors([
+                    'email' => 'Tu cuenta está desactivada. Contacta al administrador.',
+                ]);
         }
 
-        if (!$user->hasService($serviceKey)) {
-            return redirect()->route('dashboard')->with('error',
-                'No tienes acceso al módulo "' . $serviceKey . '". Contacta al administrador para contratar este servicio.'
-            );
+        if (! $user->hasService($serviceKey)) {
+            return $request->expectsJson()
+                ? response()->json(['message' => 'No tienes acceso al módulo "'.$serviceKey.'".'], 403)
+                : redirect()->route('dashboard')->with('error',
+                    'No tienes acceso al módulo "'.$serviceKey.'". Contacta al administrador para contratar este servicio.'
+                );
         }
 
         return $next($request);

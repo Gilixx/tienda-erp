@@ -31,18 +31,24 @@ class VerificarStockService
             $cantidad = $stockRow->cantidad;
 
             // ── Resolver alertas si el stock ya está bien ──
-            $resueltas += AlertaStock::where('product_id', $product->id)
-                ->where('almacen_id', $stockRow->almacen_id)
-                ->where('estado', 'activa')
-                ->when(
-                    $cantidad > $product->min_stock,
-                    fn ($q) => $q->where('tipo', 'bajo_minimo')
-                )
-                ->when(
-                    $cantidad > $product->punto_reorden,
-                    fn ($q) => $q->where('tipo', 'punto_reorden')
-                )
-                ->update(['estado' => 'resuelta']);
+            // Cada tipo se resuelve contra SU propio umbral. Encadenar dos where('tipo',…)
+            // daría `tipo='bajo_minimo' AND tipo='punto_reorden'` (imposible) y nunca
+            // resolvería nada cuando el stock supera ambos umbrales.
+            $tiposResueltos = [];
+            if ($cantidad > $product->min_stock) {
+                $tiposResueltos[] = 'bajo_minimo';
+            }
+            if ($cantidad > $product->punto_reorden) {
+                $tiposResueltos[] = 'punto_reorden';
+            }
+
+            if ($tiposResueltos) {
+                $resueltas += AlertaStock::where('product_id', $product->id)
+                    ->where('almacen_id', $stockRow->almacen_id)
+                    ->where('estado', 'activa')
+                    ->whereIn('tipo', $tiposResueltos)
+                    ->update(['estado' => 'resuelta']);
+            }
 
             // ── Crear alerta por bajo mínimo ──
             if ($product->min_stock > 0 && $cantidad <= $product->min_stock) {

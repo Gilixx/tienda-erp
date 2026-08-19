@@ -36,6 +36,18 @@ class PosController extends Controller
         return Almacen::accesiblesPara(request()->user())->pluck('id');
     }
 
+    /** Aborta con 403 si el producto no es accesible para el usuario actual. */
+    private function assertProductoAccesible($productId): void
+    {
+        $accesible = Product::accesiblesPara(request()->user())
+            ->whereKey($productId)
+            ->exists();
+
+        if (! $accesible) {
+            throw new HttpException(403, 'No tienes acceso a este producto.');
+        }
+    }
+
     /**
      * GET /api/pos/products/search?q=&almacen_id=
      * Busca productos por nombre o SKU y devuelve stock en el almacén dado.
@@ -95,7 +107,8 @@ class PosController extends Controller
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.cantidad' => 'required|integer|min:1',
-            'items.*.precio_unit' => 'required|numeric|min:0',
+            // El precio NO se acepta del cliente: se deriva del producto en el servidor
+            // (server-authoritative pricing). Cualquier precio_unit enviado se ignora.
             'items.*.serial' => 'nullable|string|max:255',
         ]);
 
@@ -109,6 +122,8 @@ class PosController extends Controller
                 // Validación de stock con lock por producto
                 $lineas = [];
                 foreach ($validated['items'] as $item) {
+                    $this->assertProductoAccesible($item['product_id']);
+
                     $product = Product::lockForUpdate()->findOrFail($item['product_id']);
 
                     $stockRow = ProductStock::lockForUpdate()
@@ -121,14 +136,16 @@ class PosController extends Controller
                         throw new HttpException(422, "Stock insuficiente de {$product->name} (disponible: {$disponible}).");
                     }
 
-                    $subtotal = round($item['cantidad'] * $item['precio_unit'], 2);
+                    // Precio autoritativo del servidor (no del cliente).
+                    $precio = round((float) $product->price, 2);
+                    $subtotal = round($item['cantidad'] * $precio, 2);
                     $total += $subtotal;
 
                     $lineas[] = [
                         'product' => $product,
                         'stockRow' => $stockRow,
                         'cantidad' => $item['cantidad'],
-                        'precio' => round((float) $item['precio_unit'], 2),
+                        'precio' => $precio,
                         'subtotal' => $subtotal,
                         'serial' => $item['serial'] ?? null,
                     ];
