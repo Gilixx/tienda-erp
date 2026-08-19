@@ -127,8 +127,15 @@ class ProductController extends Controller
 
     public function show(Request $request, string $id)
     {
+        // El historial de movimientos se limita a los almacenes accesibles: un producto
+        // compartido por un solo almacén no debe revelar su actividad en otros.
+        $almacenIds = $this->accesibleAlmacenIds();
+
         $product = Product::accesiblesPara($request->user())
-            ->with('category', 'movements.user')
+            ->with([
+                'category',
+                'movements' => fn ($q) => $q->whereIn('almacen_id', $almacenIds)->with('user'),
+            ])
             ->findOrFail($id);
 
         return response()->json($product);
