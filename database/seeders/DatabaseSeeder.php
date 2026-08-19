@@ -38,6 +38,13 @@ class DatabaseSeeder extends Seeder
             'is_active' => true,
         ]);
 
+        // Asignar al admin cualquier almacén huérfano (created_by NULL), como el
+        // "Almacén Principal" creado por migración antes de que existiera el admin.
+        // Sin dueño, el control de acceso por almacén lo deja invisible para todos.
+        \Illuminate\Support\Facades\DB::table('almacenes')
+            ->whereNull('created_by')
+            ->update(['created_by' => $admin->id]);
+
         // Create a demo user with only inventory access
         $demoUser = User::create([
             'name' => 'Usuario Demo',
