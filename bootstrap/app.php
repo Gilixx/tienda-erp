@@ -15,9 +15,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->api(prepend: [
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
         ]);
-        
-        // Middleware global de seguridad (headers HTTP)
+
+        // Middleware global de seguridad (headers HTTP) — web y API.
         $middleware->web(append: [
+            \App\Http\Middleware\SecurityHeaders::class,
+        ]);
+        $middleware->api(append: [
             \App\Http\Middleware\SecurityHeaders::class,
         ]);
 

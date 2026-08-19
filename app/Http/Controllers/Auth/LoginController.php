@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
@@ -29,20 +29,22 @@ class LoginController extends Controller
         }
 
         $credentials = $request->validate([
-            'email'    => ['required', 'email'],
+            'email' => ['required', 'email'],
             'password' => ['required'],
         ]);
 
-        // Check if user account is active before attempting auth
-        $user = \App\Models\User::where('email', $request->email)->first();
-
-        if ($user && !$user->is_active) {
-            return back()->withErrors([
-                'email' => 'Tu cuenta está desactivada. Contacta al administrador.',
-            ])->onlyInput('email');
-        }
-
+        // Se verifica la cuenta DESPUÉS de autenticar: comprobar is_active antes con
+        // un mensaje distinto permitía enumerar qué correos existen. Sin la contraseña
+        // correcta solo se devuelve el mensaje genérico de credenciales.
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
+            if (! Auth::user()->is_active) {
+                Auth::logout();
+
+                return back()->withErrors([
+                    'email' => 'Tu cuenta está desactivada. Contacta al administrador.',
+                ])->onlyInput('email');
+            }
+
             $request->session()->regenerate();
 
             return redirect()->intended(route('dashboard'));

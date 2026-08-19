@@ -8,6 +8,23 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ExportController extends Controller
 {
+    /**
+     * Neutraliza inyección de fórmulas CSV: una celda que empieza con = + - @
+     * (o tab/CR) es interpretada como fórmula por Excel/Sheets. Se antepone un
+     * apóstrofo para forzar texto. Datos como name/email/phone vienen del registro
+     * abierto y son controlados por el usuario.
+     */
+    private static function csvSafe($value): string
+    {
+        $value = (string) $value;
+
+        if ($value !== '' && in_array($value[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
+            return "'".$value;
+        }
+
+        return $value;
+    }
+
     /** GET /api/admin/export/users — CSV de usuarios y sus servicios. */
     public function users(): StreamedResponse
     {
@@ -27,12 +44,12 @@ class ExportController extends Controller
                     foreach ($usuarios as $u) {
                         fputcsv($out, [
                             $u->id,
-                            $u->name,
-                            $u->email,
-                            $u->phone,
+                            self::csvSafe($u->name),
+                            self::csvSafe($u->email),
+                            self::csvSafe($u->phone),
                             $u->role,
                             $u->is_active ? 'Sí' : 'No',
-                            $u->services->pluck('name')->implode(', '),
+                            self::csvSafe($u->services->pluck('name')->implode(', ')),
                             optional($u->created_at)->format('Y-m-d H:i'),
                         ]);
                     }

@@ -11,75 +11,92 @@ class VerificarStockService
      * Verifica stock mínimo y punto de reorden por almacén, creando o
      * resolviendo alertas en la tabla `alertas_stock`.
      *
+     * Implementación set-based: en vez de 3-5 queries por fila de stock, carga
+     * los stocks y las alertas activas en memoria y aplica un solo UPDATE (resolver)
+     * y un solo INSERT (crear). Portable entre MySQL (app) y sqlite (tests).
+     *
      * @param  int|null  $almacenId  Limita a un almacén específico.
      * @param  array<int>|null  $productIds  Limita a ciertos productos (refresco puntual).
      * @return array{creadas:int,resueltas:int}
      */
     public function verificar(?int $almacenId = null, ?array $productIds = null): array
     {
-        $stocks = ProductStock::with(['product', 'almacen'])
-            ->whereHas('product', fn ($q) => $q->where('is_active', true))
-            ->when($almacenId, fn ($q) => $q->where('almacen_id', $almacenId))
-            ->when($productIds, fn ($q) => $q->whereIn('product_id', $productIds))
-            ->get();
+        // 1) Stocks + umbrales del producto, en una sola consulta.
+        $stocks = ProductStock::query()
+            ->join('products', 'products.id', '=', 'product_stock.product_id')
+            ->where('products.is_active', true)
+            ->when($almacenId, fn ($q) => $q->where('product_stock.almacen_id', $almacenId))
+            ->when($productIds, fn ($q) => $q->whereIn('product_stock.product_id', $productIds))
+            ->get([
+                'product_stock.product_id',
+                'product_stock.almacen_id',
+                'product_stock.cantidad',
+                'products.min_stock',
+                'products.punto_reorden',
+            ]);
+
+        if ($stocks->isEmpty()) {
+            return ['creadas' => 0, 'resueltas' => 0];
+        }
+
+        // 2) Alertas activas de los pares involucrados, indexadas en memoria.
+        $activas = AlertaStock::query()
+            ->where('estado', 'activa')
+            ->whereIn('product_id', $stocks->pluck('product_id')->unique()->all())
+            ->whereIn('almacen_id', $stocks->pluck('almacen_id')->unique()->all())
+            ->get(['id', 'product_id', 'almacen_id', 'tipo']);
+
+        $activaId = [];
+        foreach ($activas as $a) {
+            $activaId["{$a->product_id}|{$a->almacen_id}|{$a->tipo}"] = $a->id;
+        }
+
+        // 3) Computar en PHP qué resolver y qué crear.
+        $resolverIds = [];
+        $insertRows = [];
+        $now = now();
+
+        $umbrales = ['bajo_minimo' => 'min_stock', 'punto_reorden' => 'punto_reorden'];
+
+        foreach ($stocks as $s) {
+            foreach ($umbrales as $tipo => $campo) {
+                $umbral = (int) $s->{$campo};
+                $id = $activaId["{$s->product_id}|{$s->almacen_id}|{$tipo}"] ?? null;
+
+                // Crear si está en/por debajo del umbral (y el umbral aplica) y no hay activa.
+                if ($umbral > 0 && $s->cantidad <= $umbral) {
+                    if (! $id) {
+                        $insertRows[] = [
+                            'product_id' => $s->product_id,
+                            'almacen_id' => $s->almacen_id,
+                            'tipo' => $tipo,
+                            'stock_actual' => $s->cantidad,
+                            'stock_minimo' => $umbral,
+                            'estado' => 'activa',
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ];
+                    }
+                } elseif ($s->cantidad > $umbral && $id) {
+                    // Stock recuperado por encima del umbral: resolver la activa.
+                    $resolverIds[] = $id;
+                }
+            }
+        }
+
+        // 4) Un UPDATE y un INSERT, sin importar cuántas filas.
+        $resueltas = 0;
+        if ($resolverIds) {
+            $resueltas = AlertaStock::whereIn('id', $resolverIds)
+                ->update(['estado' => 'resuelta', 'updated_at' => $now]);
+        }
 
         $creadas = 0;
-        $resueltas = 0;
-
-        foreach ($stocks as $stockRow) {
-            $product = $stockRow->product;
-            $cantidad = $stockRow->cantidad;
-
-            // ── Resolver alertas si el stock ya está bien ──
-            $resueltas += AlertaStock::where('product_id', $product->id)
-                ->where('almacen_id', $stockRow->almacen_id)
-                ->where('estado', 'activa')
-                ->when(
-                    $cantidad > $product->min_stock,
-                    fn ($q) => $q->where('tipo', 'bajo_minimo')
-                )
-                ->when(
-                    $cantidad > $product->punto_reorden,
-                    fn ($q) => $q->where('tipo', 'punto_reorden')
-                )
-                ->update(['estado' => 'resuelta']);
-
-            // ── Crear alerta por bajo mínimo ──
-            if ($product->min_stock > 0 && $cantidad <= $product->min_stock) {
-                $creadas += $this->crearSiFalta($product->id, $stockRow->almacen_id, 'bajo_minimo', $cantidad, $product->min_stock);
-            }
-
-            // ── Crear alerta por punto de reorden ──
-            if ($product->punto_reorden > 0 && $cantidad <= $product->punto_reorden) {
-                $creadas += $this->crearSiFalta($product->id, $stockRow->almacen_id, 'punto_reorden', $cantidad, $product->punto_reorden);
-            }
+        if ($insertRows) {
+            AlertaStock::insert($insertRows);
+            $creadas = count($insertRows);
         }
 
         return ['creadas' => $creadas, 'resueltas' => $resueltas];
-    }
-
-    /** Crea la alerta si no hay una activa del mismo tipo. Devuelve 1 si la creó. */
-    private function crearSiFalta(int $productId, ?int $almacenId, string $tipo, int $stockActual, int $stockMinimo): int
-    {
-        $existente = AlertaStock::where('product_id', $productId)
-            ->where('almacen_id', $almacenId)
-            ->where('tipo', $tipo)
-            ->where('estado', 'activa')
-            ->exists();
-
-        if ($existente) {
-            return 0;
-        }
-
-        AlertaStock::create([
-            'product_id' => $productId,
-            'almacen_id' => $almacenId,
-            'tipo' => $tipo,
-            'stock_actual' => $stockActual,
-            'stock_minimo' => $stockMinimo,
-            'estado' => 'activa',
-        ]);
-
-        return 1;
     }
 }

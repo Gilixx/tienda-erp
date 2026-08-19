@@ -52,6 +52,7 @@ class MovementController extends Controller
         ]);
 
         $this->authorizeAlmacen($validated['almacen_id']);
+        $this->assertProductoAccesible($validated['product_id']);
 
         try {
             DB::beginTransaction();

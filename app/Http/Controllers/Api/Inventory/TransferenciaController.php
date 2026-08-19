@@ -138,6 +138,11 @@ class TransferenciaController extends Controller
         $this->authorizeAlmacen($validated['almacen_origen_id']);
         $this->authorizeAlmacen($validated['almacen_destino_id']);
 
+        // No se pueden transferir productos ajenos: cada uno debe ser accesible.
+        foreach ($validated['items'] as $row) {
+            $this->assertProductoAccesible($row['product_id']);
+        }
+
         try {
             return DB::transaction(function () use ($validated) {
                 $transferencia = TransferenciaAlmacen::create([
@@ -188,6 +193,10 @@ class TransferenciaController extends Controller
                     return response()->json(['error' => 'Solo se pueden enviar transferencias en estado borrador.'], 422);
                 }
 
+                // Pasada 1: validar disponibilidad de TODOS los ítems (con lock) ANTES de
+                // descontar nada. Si un ítem posterior no tiene stock, aún no se ha mutado
+                // ninguna fila, así que retornar 422 aquí NO deja decrementos a medias.
+                $stocks = [];
                 foreach ($transferencia->items as $item) {
                     $stock = ProductStock::lockForUpdate()
                         ->where('product_id', $item->product_id)
@@ -201,6 +210,13 @@ class TransferenciaController extends Controller
                             'error' => "Stock insuficiente para '{$item->product->name}'. Disponible: {$cantidadDisponible}, requerido: {$item->cantidad}.",
                         ], 422);
                     }
+
+                    $stocks[$item->id] = $stock;
+                }
+
+                // Pasada 2: ahora sí, descontar del origen y registrar los movimientos.
+                foreach ($transferencia->items as $item) {
+                    $stock = $stocks[$item->id];
 
                     // Descontar del origen
                     $stock->decrement('cantidad', $item->cantidad);
@@ -256,7 +272,7 @@ class TransferenciaController extends Controller
 
         try {
             return DB::transaction(function () use ($id, $validated) {
-                $transferencia = TransferenciaAlmacen::with('items')
+                $transferencia = TransferenciaAlmacen::with('items.product:id,name')
                     ->lockForUpdate()
                     ->findOrFail($id);
 
@@ -277,6 +293,20 @@ class TransferenciaController extends Controller
                             'accion' => $row['categoria_accion'],
                             'categoria_destino_id' => $row['categoria_destino_id'] ?? null,
                         ];
+                    }
+                }
+
+                // Validar ANTES de acreditar nada: no se puede recibir más de lo enviado.
+                // (Igual que en `enviar`, retornar dentro de la transacción sin haber mutado
+                // aún es seguro; validar en el loop de acreditación dejaría incrementos a medias.)
+                foreach ($transferencia->items as $item) {
+                    $recibida = $recibidas[$item->id] ?? $item->cantidad;
+                    if ($recibida > $item->cantidad) {
+                        $nombre = $item->product->name ?? ('#'.$item->product_id);
+
+                        return response()->json([
+                            'error' => "No puedes recibir más de lo enviado para '{$nombre}'. Enviado: {$item->cantidad}, recibido: {$recibida}.",
+                        ], 422);
                     }
                 }
 
