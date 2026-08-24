@@ -1,6 +1,6 @@
 {
   "framework": null,
-  "installCommand": "composer install --no-dev --optimize-autoloader --no-interaction && npm ci",
+  "installCommand": "curl -sS https://getcomposer.org/installer | php && php composer.phar install --no-dev --optimize-autoloader --no-interaction && npm ci",
   "buildCommand": "npm run build",
   "functions": {
     "api/index.php": {
