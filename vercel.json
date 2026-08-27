@@ -4,7 +4,7 @@
   "buildCommand": "npm run build",
   "outputDirectory": "public",
   "functions": {
-    "server/index.php": {
+    "api/index.php": {
       "runtime": "vercel-php@0.7.4"
     }
   },
@@ -20,7 +20,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "/server/index.php"
+      "dest": "/api/index.php?__path=$1"
     }
   ]
 }
