@@ -1,10 +1,11 @@
 import api from './api';
+import Alpine from 'alpinejs';
 
 /**
  * Punto de Venta (POS) — componente Alpine.
  *
- * Se expone como `window.posApp` para que la instancia de Alpine (cargada
- * después vía CDN con `defer`) lo encuentre al inicializar `x-data`.
+ * Se expone como `window.posApp` para que Alpine (empaquetado por Vite más
+ * abajo) lo encuentre al inicializar `x-data`.
  */
 window.posApp = function (defaultAlmacenId = null) {
     return {
@@ -252,3 +253,9 @@ function todayStr() {
     const p = n => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
+
+// Alpine se sirve desde 'self' (empaquetado por Vite) en lugar del CDN, para
+// cumplir la CSP de producción (script-src 'self'). `window.posApp` ya está
+// definido arriba, así que Alpine lo resuelve al arrancar.
+window.Alpine = Alpine;
+Alpine.start();

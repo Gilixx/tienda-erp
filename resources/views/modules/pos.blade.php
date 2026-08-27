@@ -357,8 +357,7 @@
     }
 </script>
 
-{{-- Alpine.js vía CDN (posApp() ya está definido por pos.js, cargado antes con defer) --}}
-<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+{{-- Alpine.js se empaqueta con Vite dentro de resources/js/pos.js (cumple la CSP de producción). --}}
 
 </body>
 </html>
