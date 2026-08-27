@@ -12,6 +12,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Vercel (y cualquier proxy TLS) reenvia por http interno con
+        // X-Forwarded-Proto: https. Confiar en el proxy para que el request
+        // se detecte como seguro (URLs https, cookies secure, etc.).
+        $middleware->trustProxies(at: '*');
+
         $middleware->api(prepend: [
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
         ]);
