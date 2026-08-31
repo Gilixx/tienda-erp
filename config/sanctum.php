@@ -15,12 +15,21 @@ return [
     |
     */
 
-    'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', sprintf(
-        '%s%s',
-        'localhost,localhost:3000,127.0.0.1,127.0.0.1:8000,::1',
-        Sanctum::currentApplicationUrlWithPort(),
-        // Sanctum::currentRequestHost(),
-    ))),
+    'stateful' => array_filter(array_merge(
+        explode(',', (string) env('SANCTUM_STATEFUL_DOMAINS', sprintf(
+            '%s%s',
+            'localhost,localhost:3000,127.0.0.1,127.0.0.1:8000,::1',
+            Sanctum::currentApplicationUrlWithPort(),
+        ))),
+        // En Vercel el host del deploy cambia en cada release
+        // (tienda-<hash>-ag-solutions1.vercel.app), así que no se puede fijar en
+        // SANCTUM_STATEFUL_DOMAINS. El SPA y la API comparten origen, por lo que
+        // marcamos SIEMPRE como stateful el host que realmente sirve la app. Es
+        // seguro: EnsureFrontendRequestsAreStateful reemplaza este placeholder por
+        // $request->getHttpHost(), y un Origin/Referer de terceros nunca lo iguala.
+        // Sin esto, auth:sanctum devolvía 401 aunque la sesión web funcionara.
+        [Sanctum::$currentRequestHostPlaceholder],
+    )),
 
     /*
     |--------------------------------------------------------------------------
