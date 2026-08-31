@@ -33,6 +33,16 @@ if (isset($_GET['__path'])) {
     $query = http_build_query($_GET);
     $_SERVER['QUERY_STRING'] = $query;
     $_SERVER['REQUEST_URI'] = $query === '' ? $path : $path . '?' . $query;
+
+    // Vercel expone SCRIPT_NAME=/api/index.php. Symfony (Request::prepareBaseUrl)
+    // deriva el "base URL" de SCRIPT_NAME y lo recorta del pathInfo: para las rutas
+    // /api/* toma baseUrl='/api', dejando pathInfo=/inventory/... que NO coincide con
+    // la ruta registrada 'api/inventory/...' → 404 (mientras que /dashboard, que no
+    // empieza con /api, sí funcionaba). Forzamos SCRIPT_NAME a la raíz para que el
+    // REQUEST_URI reconstruido llegue íntegro al router de Laravel.
+    $_SERVER['SCRIPT_NAME'] = '/index.php';
+    $_SERVER['PHP_SELF']    = '/index.php';
+    unset($_SERVER['ORIG_SCRIPT_NAME']);
 }
 
 $kernel = $app->make(Illuminate\Contracts\Http\Kernel::class);
