@@ -39,10 +39,18 @@ class SecurityHeaders
             // Relaxed CSP for local development (Vite HMR)
             $response->headers->set('Content-Security-Policy', "default-src * 'unsafe-inline' 'unsafe-eval' data: blob: ws: wss:;");
         } else {
-            // Content Security Policy — unsafe-eval removed; unsafe-inline kept for Blade inline handlers
+            // Content Security Policy — unsafe-inline se mantiene para handlers inline de Blade.
+            // El POS usa Alpine.js, que evalúa sus expresiones en runtime (new Function())
+            // y por tanto REQUIERE 'unsafe-eval'. Se habilita SOLO en la vista del POS para
+            // no relajar el CSP del resto de módulos (inventario/admin usan JS vanilla).
+            $scriptSrc = "script-src 'self' 'unsafe-inline'";
+            if ($request->routeIs('pos')) {
+                $scriptSrc .= " 'unsafe-eval'";
+            }
+
             $csp = implode('; ', [
                 "default-src 'self'",
-                "script-src 'self' 'unsafe-inline'",
+                $scriptSrc,
                 "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
                 "font-src 'self' https://fonts.gstatic.com",
                 "img-src 'self' data:",
