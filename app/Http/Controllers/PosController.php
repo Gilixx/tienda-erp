@@ -67,8 +67,11 @@ class PosController extends Controller
         $productos = Product::accesiblesPara($request->user())
             ->where('is_active', true)
             ->where(function ($w) use ($q) {
-                $w->where('sku', 'like', "%{$q}%")
-                    ->orWhere('name', 'like', "%{$q}%");
+                // LOWER(col) LIKE ? es insensible a mayúsculas en todos los motores
+                // (Postgres LIKE es case-sensitive; MySQL/sqlite no). Cross-DB seguro.
+                $like = '%'.mb_strtolower($q).'%';
+                $w->whereRaw('LOWER(sku) LIKE ?', [$like])
+                    ->orWhereRaw('LOWER(name) LIKE ?', [$like]);
             })
             ->orderBy('name')
             ->limit(20)

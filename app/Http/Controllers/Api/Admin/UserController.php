@@ -21,10 +21,12 @@ class UserController extends Controller
 
         // Búsqueda por nombre o email
         if ($request->filled('search')) {
-            $search = $request->string('search');
+            $search = (string) $request->string('search');
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
+                // LOWER(col) LIKE ? — insensible a mayúsculas en Postgres/MySQL/sqlite.
+                $like = '%'.mb_strtolower($search).'%';
+                $q->whereRaw('LOWER(name) LIKE ?', [$like])
+                    ->orWhereRaw('LOWER(email) LIKE ?', [$like]);
             });
         }
 

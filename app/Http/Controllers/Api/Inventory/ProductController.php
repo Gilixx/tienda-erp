@@ -51,8 +51,10 @@ class ProductController extends Controller
         if ($request->filled('search')) {
             $search = $request->input('search');
             $query->where(function ($q) use ($search) {
-                $q->where('products.name', 'like', "%{$search}%")
-                    ->orWhere('products.sku', 'like', "%{$search}%");
+                // LOWER(col) LIKE ? — insensible a mayúsculas en Postgres/MySQL/sqlite.
+                $like = '%'.mb_strtolower($search).'%';
+                $q->whereRaw('LOWER(products.name) LIKE ?', [$like])
+                    ->orWhereRaw('LOWER(products.sku) LIKE ?', [$like]);
             });
         }
 
